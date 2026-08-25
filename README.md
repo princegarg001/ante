@@ -54,7 +54,8 @@ commit — it says what runs, not what is planned.
 | `constraints/modelcheck.py` — exhaustive verification | **done** |
 | `tests/mutation.py` — mutation testing of the compliance suite | **done** |
 | `tests/test_purity.py` — AST guards on the decision path | **done** |
-| `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | not started |
+| `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | **done** |
+| `demo/crash_demo.py` — real `kill -9`, zero double-debits | **done** |
 | `sim/` — latent balance process, issuer downtime, churn | not started |
 | `eval/` — harness, baselines, oracle bound | not started |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
@@ -150,6 +151,54 @@ into the constraint layer, every domain type frozen
 
 ---
 
+## Survives being killed
+
+The money path is written so that a process dying at the worst possible instant
+cannot produce a double debit. The worst possible instant is specific: after the pre-debit
+notification has landed at the gateway, before the journal records that it did. Under
+[C8](COMPLIANCE.md) a *second* notification cancels the first, so the obvious recovery
+strategy — retry anything unfinished — silently pushes the execution out by a day while
+looking like a transient network error.
+
+`make demo` spawns a worker, waits until it is parked in exactly that window, and kills it
+uncatchably. Then a fresh process starts on the same journal and the same gateway records:
+
+```
+$ make demo
+
+1 · START THE BATCH, THEN KILL IT MID-FLIGHT
+  worker pid 6592 killed uncatchably (exit 1)
+  journal: 2 effect(s) recorded, 1 in doubt
+  gateway: 3 notification(s) actually raised
+  the gap is the point — the gateway did work the journal cannot account for
+
+2 · RESTART AND RECONCILE
+  intents in doubt      1
+  adopted from gateway  1
+  never performed       0
+  resolved by asking the gateway, never by retrying
+
+4 · VERDICT
+  [PASS]  hash chain verifies                      21 records
+  [PASS]  one effect per mandate, no more          5 of 5
+  [PASS]  notifications raised in total            5, expected 5
+  [PASS]  re-run raised only the outstanding ones  2, expected 2
+  [PASS]  already-done work was skipped            3 duplicates, expected 3
+  [PASS]  no mandate was committed twice           max intents for one mandate: 1
+  [PASS]  nothing left in doubt                    0
+  [PASS]  no notification cancelled (C8)           []
+```
+
+The demo runs in CI, because a demonstration that only works on one laptop is a liability
+and one that quietly stops working gets discovered live.
+
+Any run can be reconstructed from the journal alone — there is no separate reporting store
+to drift out of sync with it:
+
+```bash
+make replay
+```
+
 ## Run it
 
 ```bash
@@ -157,7 +206,8 @@ make install     # pip install -e ".[dev]"
 make test        # unit + property tests
 make verify      # exhaustive constraint verification
 make mutants     # mutation testing
-make check       # all three — the full compliance gate
+make demo        # kill -9 a live batch, prove zero double-debits
+make check       # all of it
 ```
 
 CI runs all three on every push ([.github/workflows/compliance.yml](.github/workflows/compliance.yml)).

@@ -6,10 +6,10 @@ planned — the distinction is the point.
 ## Current state
 
 <div class="stat-grid">
-  <div class="stat ok"><span class="v">106</span><span class="k">tests passing</span></div>
+  <div class="stat ok"><span class="v">146</span><span class="k">tests passing</span></div>
   <div class="stat ok"><span class="v">2.5 M</span><span class="k">triples verified</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">1 / 12</span><span class="k">days elapsed</span></div>
+  <div class="stat"><span class="v">2 / 12</span><span class="k">days elapsed</span></div>
 </div>
 
 <div class="table-scroll">
@@ -22,7 +22,8 @@ planned — the distinction is the point.
 | `tests/mutation.py` — mutation testing of the compliance suite | ✅ **done** |
 | `tests/test_purity.py` — AST guards on the decision path | ✅ **done** |
 | CI compliance gate on every push | ✅ **done** |
-| `act/` — WAL, idempotency, ceilings, kill switch, receipts | not started |
+| `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ **done** |
+| `demo/crash_demo.py` — real `kill -9`, zero double-debits | ✅ **done** |
 | `sim/` — latent balance process, issuer downtime, churn | not started |
 | `eval/` — harness, baselines, oracle bound | not started |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
@@ -41,7 +42,7 @@ day 10, not day 13.
 | Day | Date | Build | Gate |
 | --- | --- | --- | --- |
 | 1 | 25 Aug | Constraint layer C1–C24, property tests, **exhaustive model checker** | ✅ CI prints states enumerated, 0 violations |
-| 2 | 26 Aug | Action layer: WAL, idempotency, ceilings, kill switch, hash-chained receipts | `kill -9` → restart → zero duplicates |
+| 2 | 26 Aug | Action layer: WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ real `kill -9` → restart → zero duplicates, in CI |
 | 3 | 27 Aug | Simulator: latent balance process, issuer downtime, churn, stop-list | Base rates match the calibration targets |
 | 4 | 28 Aug | Eval harness, B0/B1 baselines, common random numbers, oracle policy | Results table prints with confidence intervals |
 | 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | Reliability diagram and EV(a) curve |

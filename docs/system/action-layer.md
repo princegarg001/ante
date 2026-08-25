@@ -1,7 +1,7 @@
 # The money path
 
 ::: tip Status
-Designed, not yet built. Scheduled for day 2 — see [Status & roadmap](/project/roadmap).
+Built and running in CI, including the crash demonstration. `make demo`.
 :::
 
 Everything upstream of this point can be wrong and the damage is a bad decision. Everything
@@ -102,8 +102,29 @@ discipline.
 
 ## The demonstration
 
-> Start a batch. `kill -9` halfway. Restart. Show the write-ahead log reconciling, zero
-> duplicate debits, zero orphan notifications, hash chain intact.
+```
+$ make demo
+
+1 · START THE BATCH, THEN KILL IT MID-FLIGHT
+  worker pid 6592 killed uncatchably (exit 1)
+  journal: 2 effect(s) recorded, 1 in doubt
+  gateway: 3 notification(s) actually raised
+
+2 · RESTART AND RECONCILE
+  intents in doubt      1
+  adopted from gateway  1
+  resolved by asking the gateway, never by retrying
+
+4 · VERDICT
+  [PASS]  one effect per mandate, no more          5 of 5
+  [PASS]  no mandate was committed twice           max intents for one mandate: 1
+  [PASS]  nothing left in doubt                    0
+  [PASS]  no notification cancelled (C8)           []
+```
+
+Not a simulation: a real subprocess, parked at exactly that instant, terminated
+uncatchably. It runs in CI, because a demonstration that only works on one laptop is a
+liability and one that quietly stops working gets discovered live.
 
 Thirty seconds, and it settles the question of whether the system can be trusted with money —
 which is the question a payments panel is actually asking.
