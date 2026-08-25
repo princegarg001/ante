@@ -4,6 +4,8 @@
 
 A constrained-budget recovery agent for failed UPI Autopay / e-mandate debits.
 
+**📖 Documentation → [princegarg001.github.io/ante](https://princegarg001.github.io/ante/)**
+
 ---
 
 ## The problem everyone else is solving

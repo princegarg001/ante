@@ -1,0 +1,21 @@
+{
+  "name": "ante-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Documentation site for Ante — a retry-slot allocator for India's regulated e-mandate rails",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/princegarg001/ante.git"
+  },
+  "homepage": "https://princegarg001.github.io/ante/",
+  "license": "MIT",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

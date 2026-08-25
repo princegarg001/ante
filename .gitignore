@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -10,5 +11,14 @@ dist/
 .venv/
 venv/
 .env
+
+# Runtime artefacts
 runs/
 *.wal
+
+# Node / VitePress
+# Unanchored so a stray .vitepress/ at the repo root is ignored too — a dev
+# server started from the wrong directory leaves one behind.
+node_modules/
+**/.vitepress/dist/
+**/.vitepress/cache/

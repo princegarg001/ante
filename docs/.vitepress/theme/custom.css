@@ -1,0 +1,342 @@
+/* ==========================================================================
+   Ante — documentation theme
+
+   Restrained, high-contrast, typographically dense. The subject is a money
+   system under regulation, so the design leans closer to a technical standard
+   than to a product landing page.
+   ========================================================================== */
+
+:root {
+  /* Amber/bronze rather than the default green — the ante on the table. */
+  --vp-c-brand-1: #b45309;
+  --vp-c-brand-2: #c2670f;
+  --vp-c-brand-3: #d97706;
+  --vp-c-brand-soft: rgba(180, 83, 9, 0.14);
+
+  --vp-c-tip-1: var(--vp-c-brand-1);
+  --vp-c-tip-soft: var(--vp-c-brand-soft);
+
+  --vp-font-family-base: 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vp-font-family-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono',
+    Menlo, Consolas, monospace;
+
+  /* Semantic tokens used by the hand-built components below. */
+  --ante-rule-reg: #b45309;
+  --ante-rule-ops: #64748b;
+  --ante-ok: #15803d;
+  --ante-warn: #b45309;
+  --ante-bad: #b91c1c;
+  --ante-grid: rgba(100, 116, 139, 0.25);
+  --ante-surface: #fbfaf9;
+  --ante-surface-2: #f4f2f0;
+  --ante-ink-dim: #64748b;
+}
+
+.dark {
+  --vp-c-brand-1: #f0a45c;
+  --vp-c-brand-2: #e08c3c;
+  --vp-c-brand-3: #d97706;
+  --vp-c-brand-soft: rgba(217, 119, 6, 0.18);
+
+  --ante-rule-reg: #f0a45c;
+  --ante-rule-ops: #94a3b8;
+  --ante-ok: #4ade80;
+  --ante-warn: #fbbf24;
+  --ante-bad: #f87171;
+  --ante-grid: rgba(148, 163, 184, 0.22);
+  --ante-surface: #1b1a19;
+  --ante-surface-2: #232120;
+  --ante-ink-dim: #94a3b8;
+}
+
+/* --------------------------------------------------------------------------
+   Home hero
+   -------------------------------------------------------------------------- */
+
+.VPHero .name {
+  background: linear-gradient(120deg, var(--vp-c-brand-1), var(--vp-c-brand-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.04em;
+}
+
+.VPHero .text {
+  max-width: 30ch;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.VPHero .tagline {
+  max-width: 56ch;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+
+.vp-doc h1 {
+  letter-spacing: -0.03em;
+}
+
+.vp-doc h2 {
+  letter-spacing: -0.02em;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 1.6rem;
+  margin-top: 3rem;
+}
+
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.72;
+}
+
+/* A lead paragraph: the first paragraph after an H1. */
+.vp-doc h1 + p {
+  font-size: 1.12rem;
+  line-height: 1.65;
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc blockquote {
+  border-left: 3px solid var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  padding: 0.85rem 1.15rem;
+  border-radius: 0 6px 6px 0;
+}
+
+.vp-doc blockquote p {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+/* --------------------------------------------------------------------------
+   Tables — dense, monospaced numerics, scrollable on narrow screens
+   -------------------------------------------------------------------------- */
+
+.vp-doc div[class*='language-'],
+.vp-doc table {
+  border-radius: 8px;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.vp-doc th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ante-ink-dim);
+  font-weight: 600;
+  background: var(--ante-surface-2);
+}
+
+.vp-doc td code {
+  font-size: 0.84em;
+}
+
+/* Wide tables must scroll inside their own container, never the page. */
+.table-scroll {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.table-scroll table {
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Stat grid — the headline numbers
+   -------------------------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 0.85rem;
+  margin: 1.75rem 0;
+}
+
+.stat {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 1rem 1.05rem;
+  background: var(--ante-surface);
+}
+
+.stat .v {
+  font-family: var(--vp-font-family-mono);
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--vp-c-text-1);
+  display: block;
+}
+
+.stat .k {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ante-ink-dim);
+}
+
+.stat.ok .v {
+  color: var(--ante-ok);
+}
+
+/* --------------------------------------------------------------------------
+   Rule badges
+   -------------------------------------------------------------------------- */
+
+.rule {
+  display: inline-block;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.1rem 0.42rem;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.rule.reg {
+  color: var(--ante-rule-reg);
+}
+
+.rule.ops {
+  color: var(--ante-rule-ops);
+}
+
+/* Verification status pills used in the constraint register. */
+.pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+}
+
+.pill.primary {
+  color: var(--ante-ok);
+  background: color-mix(in srgb, var(--ante-ok) 14%, transparent);
+}
+
+.pill.secondary {
+  color: var(--ante-warn);
+  background: color-mix(in srgb, var(--ante-warn) 16%, transparent);
+}
+
+.pill.derived {
+  color: var(--ante-ink-dim);
+  background: color-mix(in srgb, var(--ante-ink-dim) 16%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Diagrams — hand-authored inline SVG, theme-aware via currentColor + vars
+   -------------------------------------------------------------------------- */
+
+.diagram {
+  margin: 1.9rem 0;
+  padding: 1.35rem 1.1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--ante-surface);
+  overflow-x: auto;
+}
+
+.diagram svg {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.diagram .cap {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--ante-ink-dim);
+  text-align: center;
+}
+
+.diagram text {
+  font-family: var(--vp-font-family-base);
+  fill: var(--vp-c-text-1);
+}
+
+.diagram text.dim {
+  fill: var(--ante-ink-dim);
+}
+
+.diagram text.mono {
+  font-family: var(--vp-font-family-mono);
+}
+
+.diagram .box {
+  fill: var(--ante-surface-2);
+  stroke: var(--ante-grid);
+  stroke-width: 1;
+}
+
+.diagram .box-accent {
+  fill: var(--vp-c-brand-soft);
+  stroke: var(--vp-c-brand-1);
+  stroke-width: 1.4;
+}
+
+.diagram .line {
+  stroke: var(--ante-grid);
+  stroke-width: 1.4;
+  fill: none;
+}
+
+.diagram .line-accent {
+  stroke: var(--vp-c-brand-1);
+  stroke-width: 1.8;
+  fill: none;
+}
+
+.diagram .band-peak {
+  fill: color-mix(in srgb, var(--ante-bad) 22%, transparent);
+}
+
+.diagram .band-ok {
+  fill: color-mix(in srgb, var(--ante-ok) 20%, transparent);
+}
+
+.diagram .band-window {
+  fill: var(--vp-c-brand-soft);
+  stroke: var(--vp-c-brand-1);
+  stroke-dasharray: 4 3;
+}
+
+/* --------------------------------------------------------------------------
+   Misc
+   -------------------------------------------------------------------------- */
+
+.vp-doc .custom-block.warning {
+  border-color: var(--ante-warn);
+}
+
+kbd,
+.vp-doc code {
+  font-variant-ligatures: none;
+}
+
+@media (max-width: 640px) {
+  .stat .v {
+    font-size: 1.32rem;
+  }
+}

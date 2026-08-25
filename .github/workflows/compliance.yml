@@ -3,9 +3,14 @@ name: compliance
 # The compliance argument is only worth something if it runs on every commit.
 # A constraint layer verified once, by hand, on day 13 is a log file.
 
+# Docs-only changes don't touch the decision path, and the mutation stage runs the
+# full suite eleven times — no reason to spend that on a prose edit.
 on:
   push:
+    paths-ignore: ['docs/**', '*.md', 'package.json', 'package-lock.json']
   pull_request:
+    paths-ignore: ['docs/**', '*.md', 'package.json', 'package-lock.json']
+  workflow_dispatch:
 
 jobs:
   verify:
