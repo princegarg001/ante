@@ -194,6 +194,11 @@ def run_policy(
                 continue
             del pending[mid]
             result = world.present(mid, now, amount)
+            # Policies may learn from their own outcomes. Optional, so a policy
+            # that does not care never has to know the hook exists.
+            observe = getattr(policy, "observe", None)
+            if observe is not None:
+                observe(mid, now, amount, result.ok)
             out = metrics.per_mandate[mid]
             out.attempts += 1
             metrics.presentations += 1

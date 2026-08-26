@@ -58,7 +58,9 @@ commit — it says what runs, not what is planned.
 | `demo/crash_demo.py` — real `kill -9`, zero double-debits | **done** |
 | `sim/` — latent balance process, issuer downtime, churn, calibration gate | **done** |
 | `eval/` — harness, baselines B0/B1/B3, lawful oracle, paired stats | **done** |
-| `belief/`, `predict/`, `policy/` — the allocator | not started |
+| `predict/` — calibrated monotone survival model | **done** |
+| `belief/` — EM-fitted pay-cycle phase filter | **done** |
+| `policy/` — the allocator | not started |
 | `ingest/` — Razorpay test-mode webhooks | not started |
 | `diagnose/` — rules ratchet + LLM adjudicator | not started |
 
@@ -162,10 +164,12 @@ $ make results
   policy                                    recovered    net value    rate  ₹/attempt  survived  illegal
   B0 · no retry                                 ₹0.00        ₹0.00   0.0%          0     81.5%        0
   B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90     78.9%        0
+  B2 · greedy EV, no budget reasoning    ₹1,89,927.20 ₹1,86,847.60  33.6%        123     78.8%        0
   B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60     79.8%      746
   oracle · clairvoyant, lawful           ₹3,31,608.72 ₹3,30,356.12  58.7%        530     80.6%        0
 
   vs B1, paired difference in net value, 95% bootstrap CI
+  B2 · greedy EV                     +24,049 ₹  [+19,071, +28,892]  p=0.0020  10/10 seeds
   B3 · Stripe-style                  -50,250 ₹  [-53,986, -46,384]  p=0.0020  0/10 seeds
   oracle · clairvoyant, lawful      +167,558 ₹  [+162,506, +172,920] p=0.0020  10/10 seeds
 ```

@@ -43,6 +43,21 @@
       "batch_size": 985.5,
       "batch_value_paise": 56530450.0
     },
+    "B2 \u00b7 greedy EV, no budget reasoning": {
+      "recovered_paise": 18992720.0,
+      "net_value_paise": 18684760.0,
+      "recovery_rate": 0.3357336837023851,
+      "slot_efficiency_paise": 12344.666342123448,
+      "survival_rate": 0.7884703876359621,
+      "presentations": 1539.8,
+      "stops": 70.2,
+      "regulatory_violations": 0.0,
+      "violating_mandates": 0.0,
+      "unactionable": 219.9,
+      "stopped_value_paise": 3935980.0,
+      "batch_size": 985.5,
+      "batch_value_paise": 56530450.0
+    },
     "B3 \u00b7 Stripe-style, 8 attempts / 2 weeks": {
       "recovered_paise": 11641020.0,
       "net_value_paise": 11254880.0,

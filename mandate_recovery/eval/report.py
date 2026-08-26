@@ -26,7 +26,11 @@ import numpy as np
 from ..core.clock import IST
 from ..core.money import fmt
 from ..sim.world import World, WorldConfig
+from ..predict.dataset import collect
+from ..predict.model import SurvivalModel, TrainedModel
+from ..sim.issuer import ISSUERS
 from .baselines import FixedSchedule, NoRetry, StripeStyle
+from .greedy import GreedyEV
 from .harness import RunMetrics, run_policy
 from .oracle import ClairvoyantOracle
 from .policy import Calendar
@@ -48,24 +52,41 @@ class Suite:
         return [attr(m) for m in self.runs[policy]]
 
 
-def _policies(world: World) -> list:
+#: Trained once per process on the TRAINING seeds only. Evaluation seeds are
+#: never used to fit anything.
+_MODEL: TrainedModel | None = None
+TRAIN_SEEDS: Final[tuple[int, ...]] = tuple(range(0, 8))
+
+
+def trained_model(config: WorldConfig) -> TrainedModel:
+    global _MODEL
+    if _MODEL is None:
+        data = collect(TRAIN_SEEDS, config)
+        _MODEL = SurvivalModel.fit(data, seed=0)
+    return _MODEL
+
+
+def _policies(world: World, model: TrainedModel) -> list:
     cal = Calendar(origin=world.origin, horizon_slots=world.horizon_slots)
+    issuer_of = {m.mandate_id: ISSUERS[m.issuer].code for m in world.mandates}
     return [
         NoRetry(cal),
         FixedSchedule(cal),
+        GreedyEV(model, cal, issuer_of=issuer_of),
         StripeStyle(cal),
         ClairvoyantOracle(world, cal),
     ]
 
 
 def run_suite(seeds: Sequence[int], config: WorldConfig) -> Suite:
+    model = trained_model(config)
     runs: dict[str, list[RunMetrics]] = {}
     for seed in seeds:
-        # Names first, from a throwaway world, so the ordering is stable.
         probe = World.generate(seed, ORIGIN, config)
-        for factory_index in range(len(_policies(probe))):
+        n_policies = len(_policies(probe, model))
+        for index in range(n_policies):
             world = World.generate(seed, ORIGIN, config)
-            policy = _policies(world)[factory_index]
+            policy = _policies(world, model)[index]
             metrics = run_policy(policy, world)
             runs.setdefault(policy.name, []).append(metrics)
     return Suite(tuple(seeds), config, runs)

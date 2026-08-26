@@ -1,8 +1,9 @@
 # Results
 
 ::: tip Status
-Baselines and the lawful clairvoyant are measured. **The allocator is not built yet** — its
-row in the table below is deliberately absent rather than estimated. It arrives on days 6–7.
+Baselines, the calibrated survival model and the lawful clairvoyant are measured. **The
+allocator is not built yet** — its row is deliberately absent rather than estimated. It
+arrives on days 6–7, and it has to beat B2's 14.4% of headroom, not B1.
 :::
 
 Ten held-out seeds, 1,500 mandates each, paired on common random numbers. Reproduce with
@@ -41,6 +42,7 @@ a judgement it never made.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | B0 · no retry | ₹0 | ₹0 | 0.0% | 0 | 81.5% | 0 | 0 |
 | **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,799** | 29.4% | 90 | 78.9% | 70 | 0 |
+| **B2 · greedy EV, no budget reasoning** | ₹1,89,927 | **₹1,86,848** | 33.6% | 123 | 78.8% | 70 | 0 |
 | B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,549 | 20.6% | 60 | 79.8% | 0 | **746** |
 | *oracle · clairvoyant, lawful* | *₹3,31,609* | *₹3,30,356* | *58.7%* | *530* | *80.6%* | *169* | *0* |
 | **the allocator** | — | — | — | — | — | — | — |
@@ -58,6 +60,7 @@ and ₹0.50 per contact. Those are modelling choices, stated rather than buried.
 | vs B1 | Mean difference | 95% bootstrap CI | p | Seeds won |
 | --- | ---: | :---: | ---: | ---: |
 | B0 · no retry | −₹1,62,799 | [−170,023, −156,802] | 0.0020 | 0/10 |
+| **B2 · greedy EV** | **+₹24,049** | [+19,071, +28,892] | 0.0020 | **10/10** |
 | B3 · Stripe-style | −₹50,250 | [−53,986, −46,384] | 0.0020 | 0/10 |
 | oracle | +₹1,67,558 | [+162,506, +172,920] | 0.0020 | 10/10 |
 
