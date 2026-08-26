@@ -31,6 +31,12 @@ jobs:
       - name: Exhaustive constraint verification
         run: python -m mandate_recovery.constraints.modelcheck --days 3 --reach-days 6
 
+      # The world must stay inside base rates taken from published market data.
+      # A simulator that flatters the agent fails silently — the numbers look
+      # better, not broken — so it is a gate rather than a report.
+      - name: World calibration — is the simulator still honest?
+        run: python -m mandate_recovery.sim.calibrate --seed 42
+
       # Spawns a worker, kills it uncatchably inside the in-doubt window, and
       # proves the restart performs no duplicate effect. A demo that only works
       # on one laptop is a liability.

@@ -56,7 +56,7 @@ commit — it says what runs, not what is planned.
 | `tests/test_purity.py` — AST guards on the decision path | **done** |
 | `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | **done** |
 | `demo/crash_demo.py` — real `kill -9`, zero double-debits | **done** |
-| `sim/` — latent balance process, issuer downtime, churn | not started |
+| `sim/` — latent balance process, issuer downtime, churn, calibration gate | **done** |
 | `eval/` — harness, baselines, oracle bound | not started |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
 | `ingest/` — Razorpay test-mode webhooks | not started |
@@ -206,6 +206,7 @@ make install     # pip install -e ".[dev]"
 make test        # unit + property tests
 make verify      # exhaustive constraint verification
 make mutants     # mutation testing
+make world       # generate a book and check it against market base rates
 make demo        # kill -9 a live batch, prove zero double-debits
 make check       # all of it
 ```

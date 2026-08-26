@@ -6,10 +6,10 @@ planned — the distinction is the point.
 ## Current state
 
 <div class="stat-grid">
-  <div class="stat ok"><span class="v">146</span><span class="k">tests passing</span></div>
+  <div class="stat ok"><span class="v">176</span><span class="k">tests passing</span></div>
   <div class="stat ok"><span class="v">2.5 M</span><span class="k">triples verified</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">2 / 12</span><span class="k">days elapsed</span></div>
+  <div class="stat"><span class="v">3 / 12</span><span class="k">days elapsed</span></div>
 </div>
 
 <div class="table-scroll">
@@ -24,7 +24,8 @@ planned — the distinction is the point.
 | CI compliance gate on every push | ✅ **done** |
 | `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ **done** |
 | `demo/crash_demo.py` — real `kill -9`, zero double-debits | ✅ **done** |
-| `sim/` — latent balance process, issuer downtime, churn | not started |
+| `sim/` — latent balance process, issuer downtime, churn | ✅ **done** |
+| `sim/calibrate.py` — base-rate gate against market data | ✅ **done** |
 | `eval/` — harness, baselines, oracle bound | not started |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
 | `ingest/` — Razorpay test-mode webhooks | not started |
@@ -43,7 +44,7 @@ day 10, not day 13.
 | --- | --- | --- | --- |
 | 1 | 25 Aug | Constraint layer C1–C24, property tests, **exhaustive model checker** | ✅ CI prints states enumerated, 0 violations |
 | 2 | 26 Aug | Action layer: WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ real `kill -9` → restart → zero duplicates, in CI |
-| 3 | 27 Aug | Simulator: latent balance process, issuer downtime, churn, stop-list | Base rates match the calibration targets |
+| 3 | 27 Aug | Simulator: latent balance process, issuer downtime, churn, stop-list | ✅ base rates gated in CI across seeds |
 | 4 | 28 Aug | Eval harness, B0/B1 baselines, common random numbers, oracle policy | Results table prints with confidence intervals |
 | 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | Reliability diagram and EV(a) curve |
 | 6 | 30 Aug | **Policy: per-mandate DP** | Beats B1 on a single seed |
@@ -94,7 +95,7 @@ the oracle bound.
 | --- | --- |
 | **Every regulatory row is still `SECONDARY`** | [Verification checklist](/constraints/sources); three highest-risk rows identified and prioritised |
 | C9 may be narrower than documented | Option-value term is parameterised so the design degrades rather than collapses |
-| A simulator that flatters the agent | Calibration targets fixed in advance; above ~45% recovery is treated as a bug in the world |
+| A simulator that flatters the agent | Bands fixed in advance and gated in CI; a deliberately kinder world is asserted to fail the gate |
 | Uplift lost in variance | Common random numbers and paired per-seed comparison |
 | Grading a model on features it was generated from | Agent belief space given a different structure from the simulator's parameters |
 

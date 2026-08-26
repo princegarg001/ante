@@ -71,6 +71,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Architecture', link: '/system/architecture' },
+          { text: 'The world simulator', link: '/system/simulator' },
           { text: 'The allocator', link: '/system/allocator' },
           { text: 'Action space', link: '/system/action-space' },
           { text: 'The money path', link: '/system/action-layer' },

@@ -194,7 +194,25 @@ which has an **interior maximum**.
 
 Collecting ₹299 of a ₹499 debit at 70% beats collecting ₹499 at 30% — ₹209 against ₹150.
 
-Two honest caveats, both handled in the design:
+::: warning How wide this actually is — measured, not assumed
+Building [the simulator](/system/simulator#the-amount-lever-is-narrower-than-the-design-claimed)
+qualified this claim. The interior maximum is real, but it is **not** universal:
+
+| Debit ÷ good-day balance | Prefer a partial collection |
+| --- | --- |
+| under 0.15 | 0.0% |
+| 0.35 – 0.80 | 9.4% |
+| over 0.80 | 15.2% |
+
+A ₹499 debit against an account holding either ₹5,000 or ₹20 cannot be helped by shrinking
+it. The lever pays where the debit is comparable to what the account actually carries — 36%
+of the book, and 45% of the value at risk. The example above is drawn from that segment
+rather than being typical.
+
+Better to have found that here than in a panel room.
+:::
+
+Two further caveats, both handled in the design:
 
 - Partial collection is only legal where the mandate is a variable-amount mandate
   ([C19](/constraints/)). It is gated per-mandate by the `OPS-PARTIAL` guard.

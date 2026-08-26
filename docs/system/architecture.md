@@ -77,7 +77,7 @@ is deliberate and it is not the order data flows in.
 
 | # | Component | Input → Output | Status |
 | --- | --- | --- | --- |
-| 0 | `sim/` | seed → mandate book + failure events | planned |
+| 0 | `sim/` | seed → mandate book + failure events | **built** |
 | 1 | `ingest/` | webhook or sim event → `FailureEvent` | planned |
 | 2 | `diagnose/` | `FailureEvent` → `(CauseClass, confidence)` | planned |
 | 3 | `belief/` | observations → posterior over liquidity type | planned |
