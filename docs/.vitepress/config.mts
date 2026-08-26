@@ -37,7 +37,7 @@ export default defineConfig({
       { text: 'Constraints', link: '/constraints/' },
       { text: 'System', link: '/system/architecture' },
       { text: 'Engineering', link: '/engineering/verification' },
-      { text: 'Analysis', link: '/analysis/evaluation' },
+      { text: 'Results', link: '/analysis/results' },
       {
         text: 'Status',
         items: [
@@ -90,6 +90,7 @@ export default defineConfig({
         text: 'Analysis',
         collapsed: false,
         items: [
+          { text: 'Results', link: '/analysis/results' },
           { text: 'Evaluation protocol', link: '/analysis/evaluation' },
           { text: 'Market data', link: '/analysis/market' },
         ],

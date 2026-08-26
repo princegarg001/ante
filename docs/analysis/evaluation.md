@@ -1,7 +1,8 @@
 # Evaluation protocol
 
 ::: tip Status
-Designed, not yet built. Scheduled for day 4 — see [Status & roadmap](/project/roadmap).
+Built. B0, B1, B3 and the lawful clairvoyant are measured on held-out seeds —
+see **[Results](/analysis/results)**. B2 arrives with the probability model on day 5.
 :::
 
 Razorpay's bar for this track is *measured money recovered across a batch*. This page is how
@@ -139,18 +140,22 @@ and held is a stronger signal than any accuracy number.
 
 ## Simulator honesty
 
-The evaluation is only as good as the world it runs in, so the simulator is tuned to be
-uncomfortable:
+The evaluation is only as good as the world it runs in, so the world is constrained rather
+than tuned:
 
 <div class="table-scroll">
 
-| Target | Value |
-| --- | --- |
-| First-attempt approval on the due date | ~30–40% |
-| Total collection after recovery | **below ~45%** |
-| Genuinely unrecoverable share of the batch | 12–18% — closed accounts, revoked mandates, real churn |
+| Band | Measured | Source |
+| --- | ---: | --- |
+| Approval **per execution** | 0.240 | reported ~30% at the largest remitter bank |
+| First-attempt approval | 0.357 | first attempts sit above the all-execution average |
+| Insufficient-funds share of failures | 0.796 | business declines dominate |
+| Unrecoverable share of the book | 0.130 | closed, revoked, lapsed, genuine churn |
 
 </div>
 
-If the agent recovers 80%, the world is fake and the number is worthless. Details and sourcing
-in [Market data](/analysis/market).
+The bands are fixed before any policy exists and gated in CI across seeds, and the gate is
+asserted to be capable of failing — a deliberately kinder world must be detected. One band was
+replaced during construction because it turned out to have no source behind it, and the
+reasoning is recorded rather than left to memory. Details in
+[the world simulator](/system/simulator#the-calibration-gate) and [Market data](/analysis/market).

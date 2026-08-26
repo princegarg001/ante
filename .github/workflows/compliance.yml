@@ -37,6 +37,11 @@ jobs:
       - name: World calibration — is the simulator still honest?
         run: python -m mandate_recovery.sim.calibrate --seed 42
 
+      # The headline number, on held-out seeds, with paired intervals. Kept
+      # small enough for CI; the reported table uses the full book.
+      - name: Evaluation suite — measured recovery
+        run: python -m mandate_recovery.eval.report --seeds 100-104 --mandates 600
+
       # Spawns a worker, kills it uncatchably inside the in-doubt window, and
       # proves the restart performs no duplicate effect. A demo that only works
       # on one laptop is a liability.

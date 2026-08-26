@@ -6,10 +6,10 @@ planned — the distinction is the point.
 ## Current state
 
 <div class="stat-grid">
-  <div class="stat ok"><span class="v">176</span><span class="k">tests passing</span></div>
+  <div class="stat ok"><span class="v">202</span><span class="k">tests passing</span></div>
   <div class="stat ok"><span class="v">2.5 M</span><span class="k">triples verified</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">3 / 12</span><span class="k">days elapsed</span></div>
+  <div class="stat"><span class="v">4 / 12</span><span class="k">days elapsed</span></div>
 </div>
 
 <div class="table-scroll">
@@ -26,7 +26,7 @@ planned — the distinction is the point.
 | `demo/crash_demo.py` — real `kill -9`, zero double-debits | ✅ **done** |
 | `sim/` — latent balance process, issuer downtime, churn | ✅ **done** |
 | `sim/calibrate.py` — base-rate gate against market data | ✅ **done** |
-| `eval/` — harness, baselines, oracle bound | not started |
+| `eval/` — harness, baselines B0/B1/B3, lawful oracle, paired stats | ✅ **done** |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
 | `ingest/` — Razorpay test-mode webhooks | not started |
 | `diagnose/` — rules ratchet + LLM adjudicator | not started |
@@ -45,7 +45,7 @@ day 10, not day 13.
 | 1 | 25 Aug | Constraint layer C1–C24, property tests, **exhaustive model checker** | ✅ CI prints states enumerated, 0 violations |
 | 2 | 26 Aug | Action layer: WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ real `kill -9` → restart → zero duplicates, in CI |
 | 3 | 27 Aug | Simulator: latent balance process, issuer downtime, churn, stop-list | ✅ base rates gated in CI across seeds |
-| 4 | 28 Aug | Eval harness, B0/B1 baselines, common random numbers, oracle policy | Results table prints with confidence intervals |
+| 4 | 28 Aug | Eval harness, B0/B1/B3 baselines, common random numbers, oracle policy | ✅ [results table](/analysis/results) with paired bootstrap intervals |
 | 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | Reliability diagram and EV(a) curve |
 | 6 | 30 Aug | **Policy: per-mandate DP** | Beats B1 on a single seed |
 | 7 | 31 Aug | **Dual ascent and slot auction**, B2/B3 baselines | Auction book prints; B3 violation count published |

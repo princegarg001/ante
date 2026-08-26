@@ -57,7 +57,7 @@ commit — it says what runs, not what is planned.
 | `act/` — WAL, idempotency, ceilings, kill switch, hash-chained receipts | **done** |
 | `demo/crash_demo.py` — real `kill -9`, zero double-debits | **done** |
 | `sim/` — latent balance process, issuer downtime, churn, calibration gate | **done** |
-| `eval/` — harness, baselines, oracle bound | not started |
+| `eval/` — harness, baselines B0/B1/B3, lawful oracle, paired stats | **done** |
 | `belief/`, `predict/`, `policy/` — the allocator | not started |
 | `ingest/` — Razorpay test-mode webhooks | not started |
 | `diagnose/` — rules ratchet + LLM adjudicator | not started |
@@ -150,6 +150,36 @@ into the constraint layer, every domain type frozen
 ([tests/test_purity.py](tests/test_purity.py)).
 
 ---
+
+## Measured recovery
+
+Ten held-out seeds, 1,500 mandates each, paired on common random numbers. The allocator is not
+built yet, so its row is absent rather than estimated.
+
+```
+$ make results
+
+  policy                                    recovered    net value    rate  ₹/attempt  survived  illegal
+  B0 · no retry                                 ₹0.00        ₹0.00   0.0%          0     81.5%        0
+  B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90     78.9%        0
+  B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60     79.8%      746
+  oracle · clairvoyant, lawful           ₹3,31,608.72 ₹3,30,356.12  58.7%        530     80.6%        0
+
+  vs B1, paired difference in net value, 95% bootstrap CI
+  B3 · Stripe-style                  -50,250 ₹  [-53,986, -46,384]  p=0.0020  0/10 seeds
+  oracle · clairvoyant, lawful      +167,558 ₹  [+162,506, +172,920] p=0.0020  10/10 seeds
+```
+
+**Stripe's published policy, transplanted:** proposes illegal actions on **76% of the batch**
+(C5 × 1,106, RATCHET × 552, C2 × 296) *and* collects ₹50,250 less. It is not being penalised
+twice — illegal proposals are refused and not executed, so it is scored on what it could
+lawfully achieve. Most of what it wants to do simply is not available here.
+
+**Headroom to a lawful clairvoyant is ₹1,67,558.** The oracle recovers ₹530 per attempt
+against B1's ₹90 — one well-timed presentation instead of three speculative ones. That gap is
+the allocation thesis, visible before the allocator exists.
+
+Full detail, method and caveats: [Results](https://princegarg001.github.io/ante/analysis/results).
 
 ## Survives being killed
 

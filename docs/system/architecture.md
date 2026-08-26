@@ -85,7 +85,7 @@ is deliberate and it is not the order data flows in.
 | 5 | `constraints/` | `(action, state, clock)` → `Allow \| Veto` | **built** |
 | 6 | `policy/` | batch of states + prices → allocation | planned |
 | 7 | `act/` | permitted action → durable, idempotent effect | **built** |
-| 8 | `eval/` | policy + seeds → metrics vs baselines | planned |
+| 8 | `eval/` | policy + seeds → metrics vs baselines | **built** |
 
 </div>
 
@@ -142,7 +142,7 @@ ante/
 │   ├── diagnose/           # rules ratchet + LLM adjudicator
 │   ├── ingest/             # webhook consumer + normaliser
 │   ├── sim/                # world simulator
-│   └── eval/               # harness, metrics, oracle bound
+│   └── eval/               # harness, metrics, oracle bound          ✅ built
 ├── tests/                  # unit, property, stateful, mutation, purity
 ├── docs/                   # this site
 └── .github/workflows/      # compliance gate on every push

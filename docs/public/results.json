@@ -1,0 +1,77 @@
+{
+  "seeds": [
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109
+  ],
+  "mandates": 1500,
+  "policies": {
+    "B0 \u00b7 no retry": {
+      "recovered_paise": 0.0,
+      "net_value_paise": 0.0,
+      "recovery_rate": 0.0,
+      "slot_efficiency_paise": 0.0,
+      "survival_rate": 0.8149958867746754,
+      "presentations": 0.0,
+      "stops": 0.0,
+      "regulatory_violations": 0.0,
+      "violating_mandates": 0.0,
+      "unactionable": 219.9,
+      "stopped_value_paise": 0.0,
+      "batch_size": 985.5,
+      "batch_value_paise": 56530450.0
+    },
+    "B1 \u00b7 fixed +24/+72/+168h": {
+      "recovered_paise": 16648230.0,
+      "net_value_paise": 16279850.0,
+      "recovery_rate": 0.2943992875428997,
+      "slot_efficiency_paise": 9045.40577966485,
+      "survival_rate": 0.7887025422899818,
+      "presentations": 1841.9,
+      "stops": 70.2,
+      "regulatory_violations": 0.0,
+      "violating_mandates": 0.0,
+      "unactionable": 219.9,
+      "stopped_value_paise": 3935980.0,
+      "batch_size": 985.5,
+      "batch_value_paise": 56530450.0
+    },
+    "B3 \u00b7 Stripe-style, 8 attempts / 2 weeks": {
+      "recovered_paise": 11641020.0,
+      "net_value_paise": 11254880.0,
+      "recovery_rate": 0.20594543441185734,
+      "slot_efficiency_paise": 6033.187586335539,
+      "survival_rate": 0.7983256168601979,
+      "presentations": 1930.7,
+      "stops": 0.0,
+      "regulatory_violations": 1953.0,
+      "violating_mandates": 746.4,
+      "unactionable": 219.9,
+      "stopped_value_paise": 0.0,
+      "batch_size": 985.5,
+      "batch_value_paise": 56530450.0
+    },
+    "oracle \u00b7 clairvoyant, lawful": {
+      "recovered_paise": 33160872.1,
+      "net_value_paise": 33035612.1,
+      "recovery_rate": 0.5865559427009999,
+      "slot_efficiency_paise": 52955.01426269731,
+      "survival_rate": 0.8062684808745063,
+      "presentations": 626.3,
+      "stops": 169.1,
+      "regulatory_violations": 0.0,
+      "violating_mandates": 0.0,
+      "unactionable": 219.9,
+      "stopped_value_paise": 9938467.9,
+      "batch_size": 985.5,
+      "batch_value_paise": 56530450.0
+    }
+  }
+}
