@@ -24,6 +24,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+#: The suite that exists to catch a mutated regulation. Deliberately narrower
+#: than the whole test run.
+#:
+#: Every mutation below edits the constraint layer or the model checker. Running
+#: the simulator, model and evaluation tests against each one added roughly
+#: fifteen minutes to CI to re-fit gradient-boosted trees eleven times, and none
+#: of them is capable of detecting a changed peak window — that is what these
+#: files are for. Scoping the run to them is a statement about which suite is
+#: being tested for teeth, not a shortcut around the check.
+COMPLIANCE_SUITE: tuple[str, ...] = (
+    "tests/test_clock.py",
+    "tests/test_constraints.py",
+    "tests/test_properties.py",
+    "tests/test_modelcheck.py",
+    "tests/test_regulatory_constants.py",
+)
 RULES = ROOT / "mandate_recovery" / "constraints" / "rules.py"
 CLOCK = ROOT / "mandate_recovery" / "core" / "clock.py"
 CHECK = ROOT / "mandate_recovery" / "constraints" / "modelcheck.py"
@@ -135,7 +152,10 @@ def _run_suite() -> bool:
     """True if the suite is green. Exit code, not log scraping — a truncated
     traceback once made a red run look green here."""
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-m", "not slow", "-p", "no:cacheprovider"],
+        [
+            sys.executable, "-m", "pytest", "-q", "-m", "not slow",
+            "-p", "no:cacheprovider", *COMPLIANCE_SUITE,
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -159,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 78)
     print("MUTATION TESTING — does the compliance suite actually have teeth?")
     print("=" * 78)
+    print()
+    print("suite under test: " + " ".join(COMPLIANCE_SUITE))
 
     if not _run_suite():
         print("\nBaseline suite is already failing. Fix that before mutating.")
