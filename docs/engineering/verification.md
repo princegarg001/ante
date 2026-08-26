@@ -5,7 +5,7 @@ Built and running in CI on every push.
 :::
 
 Most submissions will assert compliance with a handful of unit tests. This layer makes a
-stronger claim, in three levels, and each level exists because the level below it can pass
+stronger claim, in four levels, and each level exists because the level below it can pass
 while being wrong.
 
 <div class="stat-grid">
@@ -13,7 +13,7 @@ while being wrong.
   <div class="stat ok"><span class="v">54,889</span><span class="k">reachable states</span></div>
   <div class="stat ok"><span class="v">0</span><span class="k">violations</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">106</span><span class="k">tests</span></div>
+  <div class="stat"><span class="v">146</span><span class="k">tests</span></div>
   <div class="stat"><span class="v">15 s</span><span class="k">full verification</span></div>
 </div>
 
@@ -154,6 +154,28 @@ only nine, which is the most useful thing that has happened in this build so far
 
 That story is worth its own page: [Mutation testing](/engineering/mutation).
 
+## Level 4 · The crash demo, run for real
+
+The [money path](/system/action-layer) is verified differently, because the property that
+matters there is not "no illegal action is permitted" but "no effect happens twice". That
+cannot be established by enumeration — it needs a process to actually die.
+
+So `make demo` spawns a worker, waits until it is parked in the in-doubt window, and kills it
+uncatchably. A fresh process reconciles and re-runs the identical batch. Eight checks, each
+computed from the journal rather than from the demo's own bookkeeping:
+
+```
+[PASS]  hash chain verifies                      21 records
+[PASS]  one effect per mandate, no more          5 of 5
+[PASS]  re-run raised only the outstanding ones  2, expected 2
+[PASS]  no mandate was committed twice           max intents for one mandate: 1
+[PASS]  nothing left in doubt                    0
+[PASS]  no notification cancelled (C8)           []
+```
+
+It runs in CI. A demonstration that only works on one laptop is a liability, and one that
+quietly stops working gets discovered live.
+
 ## Static guards
 
 The claims that make replay meaningful are enforced over the AST rather than left as prose:
@@ -172,9 +194,10 @@ Even the guards are checked for being able to fail.
 ```bash
 make test      # unit, property, stateful, purity — 30s
 make verify    # exhaustive enumeration — 15s
+make demo      # real kill -9 against a live batch — 10s
 make mutants   # mutation testing — 6 min
-make check     # all three
+make check     # all of it
 ```
 
-CI runs all three on every push. Compliance verified once by hand on the last day is a log
+CI runs all of it on every push. Compliance verified once by hand on the last day is a log
 file, not a control.

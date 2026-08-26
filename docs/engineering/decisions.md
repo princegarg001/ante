@@ -3,7 +3,11 @@
 Decisions that were genuinely contested, with the reasoning. Documented so they can be argued
 with rather than discovered by reading source.
 
-## Regulatory and operational vetoes are separate registries
+---
+
+## Day 1 · The constraint layer
+
+### Regulatory and operational vetoes are separate registries
 
 The constraint layer distinguishes <span class="rule reg">REGULATORY</span> rules, which trace
 to an NPCI or RBI instrument, from <span class="rule ops">OPERATIONAL</span> guards, which are
@@ -25,7 +29,7 @@ def test_regulatory_vetoes_are_reported_ahead_of_operational_ones():
     assert is_permitted(action, s, ORIGIN).kind is RuleKind.REGULATORY
 ```
 
-## Money is an integer count of paise, everywhere
+### Money is an integer count of paise, everywhere
 
 No floats touch money at any point. A float rupee amount is a rounding difference waiting to
 appear between what the policy valued, what the constraint layer checked, and what the ledger
@@ -33,7 +37,7 @@ recorded — three numbers that must be identical for an audit trail to mean any
 
 `to_rupees()` exists but is documented as lossy and presentation-only.
 
-## Nothing reads the wall clock
+### Nothing reads the wall clock
 
 Every function that cares about time takes it as an argument. There is no `datetime.now()`
 anywhere in the package.
@@ -54,7 +58,7 @@ FORBIDDEN_CLOCK_CALLS = {
 `time.perf_counter` is exempt in the model checker alone — it measures how long verification
 took and never influences a verdict.
 
-## Naive datetimes are rejected outright
+### Naive datetimes are rejected outright
 
 ```python
 if dt.tzinfo is None:
@@ -76,7 +80,7 @@ IST is implemented as a fixed UTC+05:30 offset rather than a `zoneinfo` lookup. 
 daylight saving, so the offset is exact, and it removes a `tzdata` dependency that Windows
 images frequently lack.
 
-## The slot grid is derived, never hardcoded
+### The slot grid is derived, never hardcoded
 
 `non_peak_slots_per_day()` returns 33 by *computing* it from `PEAK_WINDOWS`:
 
@@ -89,13 +93,13 @@ def non_peak_slots_per_day() -> int:
 If the peak windows are ever corrected during primary-source verification, every derived
 quantity moves with them and nothing needs hunting down.
 
-## Re-planning is explicit
+### Re-planning is explicit
 
 Discussed under [action space](/system/action-space#cancelpending-must-be-explicit). The rails
 would let a new notification silently cancel the previous one; the system refuses to use that,
 so abandoning a commitment appears in the audit log as a decision rather than a side effect.
 
-## Exact DP rather than reinforcement learning
+### Exact DP rather than reinforcement learning
 
 The per-mandate problem is roughly 30,000 nodes. Backward induction solves it exactly in
 sub-milliseconds, deterministically, and produces the value function the slot auction needs
@@ -104,7 +108,7 @@ for its bids.
 RL would be slower, non-deterministic, unverifiable, and would then have to be defended. It
 would be a downgrade dressed as sophistication.
 
-## A dead rule was kept, with a test explaining why
+### A dead rule was kept, with a test explaining why
 
 <span class="rule reg">C7</span> — the 23:50 notification cut-off — turns out to be
 **unreachable** on the 30-minute slot grid. The 24-hour minimum lead means a notification
@@ -126,7 +130,7 @@ def test_c7_is_unreachable_on_the_thirty_minute_grid():
 
 The test also fails loudly if the grid assumption is ever broken by a future change.
 
-## Every emitted rule id must be registered
+### Every emitted rule id must be registered
 
 A veto with no registry entry cannot be rendered into an audit log or cited in a pitch, so it
 must not be possible to emit one:
@@ -138,7 +142,7 @@ def test_every_emitted_rule_id_is_registered(state):
         assert v.kind is RULES[v.rule_id][0]
 ```
 
-## An optimisation that was justified rather than assumed
+### An optimisation that was justified rather than assumed
 
 The reachability search originally re-derived, for every reachable state, that no commit is
 permitted while a notification is pending. That cost 20 of the 21 seconds the search took.
@@ -154,3 +158,100 @@ needs its justification recorded next to it:
 ```
 
 Result: 20.5s → 0.52s, with an identical reachable state count.
+
+---
+
+## Day 2 · The money path
+
+### Recovery interrogates; it never retries
+
+The single most consequential decision in `act/`. After a crash in the in-doubt window the
+caller has two options — ask the gateway what it already did, or guess — and guessing raises a
+second pre-debit notification, which under
+[C8](/constraints/critical#c8-commitments-are-serialized) cancels the first.
+
+So `lookup(idem_key)` is a required method on the gateway interface rather than a convenience.
+A provider that can only be told to do things, and never asked what it has already done, cannot
+be recovered from safely.
+
+### A crash writes no outcome record
+
+```python
+except Exception:
+    # Deliberately not writing an EFFECT record. The effect may well have landed,
+    # and claiming otherwise would be a lie the log cannot take back.
+    raise
+```
+
+The tempting alternative — record "failed" and move on — writes a guess down as a fact.
+Silence is the honest state, and it is the state `recover()` knows how to resolve.
+
+### A torn tail is not corruption
+
+A process killed mid-write leaves a partial final line. That is normal operation for a
+write-ahead log and must not prevent startup, so it is truncated. A record that fails
+verification anywhere *else* is refused outright.
+
+The distinction that makes this safe is mechanical rather than heuristic: **a torn write cannot
+end in a newline**, so anything that does was appended deliberately. Refusing on tamper is the
+point — a journal that has been edited cannot prove what happened, and repairing it silently
+would destroy the evidence that it was edited.
+
+### The ledger is derived from the journal, never stored beside it
+
+Applied keys, in-doubt intents and blast-radius counters are all rebuilt by replaying the log.
+A second source of truth would be a second thing to fall out of sync.
+
+It also means ceilings survive a restart within a run, so a crash loop cannot spend the full
+blast radius once per restart.
+
+### Outcomes are filed against the run that intended them
+
+Recovery originally wrote resolved outcomes under a synthetic `recovery` run id. A run-scoped
+replay then filtered those records out and reported the intent as permanently in doubt — an
+audit trail claiming the system had lost track of an effect it had in fact reconciled.
+
+Outcomes now carry the original run id and the original amount, so blast-radius counters do not
+under-count exactly the spend a crash made hardest to see. The `resolution` field records that
+the outcome arrived late.
+
+This one passed every test that existed. It was found by running `replay` and reading the
+output, which is an argument for building the replay tool early rather than at the end.
+
+### A declined presentation still counts as applied
+
+C1 counts presentations, not successes. An attempt declined for insufficient funds consumed the
+slot, so the ledger treats it as applied and never silently repeats it. Only an effect the
+gateway *never performed* leaves the decision free to be taken again — which is why recovery
+distinguishes `performed` from `ok`.
+
+### A ceiling raises rather than returns
+
+```python
+raise CeilingExceeded(f"run {run_id}: execution cap {max_executions} reached")
+```
+
+A blast radius a caller can ignore is a warning, not a ceiling. The check also runs *before*
+the effect, which is asserted directly rather than assumed:
+
+```python
+assert gw.raise_calls == 1, "the effect ran before the ceiling was checked"
+```
+
+### The kill switch is file-backed
+
+Halting a misbehaving agent should not require a deploy, a restart, or access to the source.
+An operator touches a file. It is checked before every effect, so engaging it stops new work
+while anything in flight completes.
+
+### The constraint layer is re-consulted at the action boundary
+
+The policy is supposed to have checked. The executor checks again anyway, and journals the veto
+with the rule that fired. Defence in depth: a bug in the allocator cannot become an illegal
+debit, and a refused action leaves as much evidence as an executed one.
+
+### Dry run is the default
+
+`ExecutionMode.DRY_RUN` unless a caller explicitly says otherwise, and the mode is recorded in
+both the `RUN_START` and every `INTENT` record — so a replay can never be ambiguous about
+whether a run was real.
