@@ -13,6 +13,8 @@ dependencies = [
     # present locally only because scikit-learn pulls it in, which masked the
     # missing declaration until CI ran on a clean environment.
     "scipy>=1.11",
+    # Gradient boosting with monotonic constraints, isotonic calibration.
+    "scikit-learn>=1.4",
 ]
 
 [project.optional-dependencies]

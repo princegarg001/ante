@@ -12,6 +12,7 @@ being spelled differently, and so the failure message names the line.
 from __future__ import annotations
 
 import ast
+import sys
 from pathlib import Path
 
 import pytest
@@ -128,3 +129,65 @@ def test_every_domain_type_is_frozen() -> None:
                 assert not isinstance(f.default, (list, dict, set)), (
                     f"{name}.{f.name} has a mutable default"
                 )
+
+
+# --------------------------------------------------------------------------- #
+# Dependencies are declared, not inherited
+# --------------------------------------------------------------------------- #
+
+#: Import name -> distribution name, where they differ.
+_DISTRIBUTION_NAME = {"sklearn": "scikit-learn"}
+
+
+def _declared_dependencies() -> set[str]:
+    import tomllib
+
+    data = tomllib.loads((PACKAGE.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    project = data["project"]
+    raw = list(project.get("dependencies", []))
+    for extra in project.get("optional-dependencies", {}).values():
+        raw.extend(extra)
+    names = set()
+    for spec in raw:
+        name = spec.split(";")[0]
+        for sep in (">=", "<=", "==", "~=", ">", "<", "["):
+            name = name.split(sep)[0]
+        names.add(name.strip().lower().replace("_", "-"))
+    return names
+
+
+def _third_party_imports() -> dict[str, str]:
+    """Top-level non-stdlib, non-local imports across the package, with a source."""
+    stdlib = set(sys.stdlib_module_names)
+    found: dict[str, str] = {}
+    for path in package_files():
+        for node in ast.walk(parse(path)):
+            if isinstance(node, ast.Import):
+                names = [a.name.split(".")[0] for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                names = [(node.module or "").split(".")[0]]
+            else:
+                continue
+            for name in names:
+                if name and name not in stdlib and not name.startswith("_"):
+                    found.setdefault(name, f"{path.name}:{node.lineno}")
+    return found
+
+
+def test_every_third_party_import_is_declared() -> None:
+    """Twice in two days a package was used without being declared — scipy, then
+    scikit-learn. Both worked locally because something else pulled them in, and
+    both failed only when CI installed into a clean environment.
+
+    Adding the missing line fixes one occurrence. This stops the third.
+    """
+    declared = _declared_dependencies()
+    undeclared = {
+        name: where
+        for name, where in _third_party_imports().items()
+        if _DISTRIBUTION_NAME.get(name, name).lower() not in declared
+    }
+    assert not undeclared, (
+        "third-party imports missing from pyproject.toml dependencies: "
+        + ", ".join(f"{n} ({w})" for n, w in sorted(undeclared.items()))
+    )
