@@ -9,6 +9,10 @@ description = "A constrained-budget recovery agent for failed UPI Autopay / e-ma
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
+    # Wilcoxon signed-rank for the paired comparison. Declared explicitly: it was
+    # present locally only because scikit-learn pulls it in, which masked the
+    # missing declaration until CI ran on a clean environment.
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
