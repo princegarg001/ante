@@ -26,8 +26,8 @@ import numpy as np
 from ..core.clock import IST
 from ..core.money import fmt
 from ..sim.world import World, WorldConfig
-from ..predict.dataset import collect
-from ..predict.model import SurvivalModel, TrainedModel
+from ..policy.allocator import SlotAllocator
+from ..predict.pipeline import Fitted, fit_cached
 from ..sim.issuer import ISSUERS
 from .baselines import FixedSchedule, NoRetry, StripeStyle
 from .greedy import GreedyEV
@@ -52,41 +52,37 @@ class Suite:
         return [attr(m) for m in self.runs[policy]]
 
 
-#: Trained once per process on the TRAINING seeds only. Evaluation seeds are
-#: never used to fit anything.
-_MODEL: TrainedModel | None = None
+#: Fitted once per process on the TRAINING seeds only. Evaluation seeds are never
+#: used to fit anything.
 TRAIN_SEEDS: Final[tuple[int, ...]] = tuple(range(0, 8))
 
 
-def trained_model(config: WorldConfig) -> TrainedModel:
-    global _MODEL
-    if _MODEL is None:
-        data = collect(TRAIN_SEEDS, config)
-        _MODEL = SurvivalModel.fit(data, seed=0)
-    return _MODEL
+def trained_model(config: WorldConfig) -> Fitted:
+    return fit_cached(TRAIN_SEEDS, config)
 
 
-def _policies(world: World, model: TrainedModel) -> list:
+def _policies(world: World, fitted: Fitted) -> list:
     cal = Calendar(origin=world.origin, horizon_slots=world.horizon_slots)
     issuer_of = {m.mandate_id: ISSUERS[m.issuer].code for m in world.mandates}
     return [
         NoRetry(cal),
         FixedSchedule(cal),
-        GreedyEV(model, cal, issuer_of=issuer_of),
+        GreedyEV(fitted.model, cal, issuer_of=issuer_of, profile=fitted.profile),
         StripeStyle(cal),
+        SlotAllocator(fitted.model, cal, profile=fitted.profile, issuer_of=issuer_of),
         ClairvoyantOracle(world, cal),
     ]
 
 
 def run_suite(seeds: Sequence[int], config: WorldConfig) -> Suite:
-    model = trained_model(config)
+    fitted = trained_model(config)
     runs: dict[str, list[RunMetrics]] = {}
     for seed in seeds:
         probe = World.generate(seed, ORIGIN, config)
-        n_policies = len(_policies(probe, model))
+        n_policies = len(_policies(probe, fitted))
         for index in range(n_policies):
             world = World.generate(seed, ORIGIN, config)
-            policy = _policies(world, model)[index]
+            policy = _policies(world, fitted)[index]
             metrics = run_policy(policy, world)
             runs.setdefault(policy.name, []).append(metrics)
     return Suite(tuple(seeds), config, runs)
@@ -185,6 +181,19 @@ def render(suite: Suite) -> None:
             suite.values(name, lambda m: m.net_value_paise / 100), b_vals, o_vals
         )
         print(f"  {'recovery efficiency · ' + name.split(' · ')[0]:<38}{eff:>12.1%}")
+
+    # The ablation that isolates allocation from the model.
+    greedy = next((n for n in names if n.startswith("B2")), None)
+    alloc = next((n for n in names if n.startswith("allocator")), None)
+    if greedy and alloc:
+        g = suite.values(greedy, lambda m: m.net_value_paise / 100)
+        a = suite.values(alloc, lambda m: m.net_value_paise / 100)
+        c = compare(a, g, a_name=alloc, b_name=greedy)
+        print()
+        print("-" * 100)
+        print("  WHAT ALLOCATION IS WORTH, HOLDING THE MODEL FIXED")
+        print("-" * 100)
+        print(f"  {'allocator vs B2 (same model, no budget reasoning)':<38}{c.render(unit=' ₹')}")
 
     print("\n" + "=" * 100)
 

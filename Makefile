@@ -1,4 +1,4 @@
-.PHONY: help install test verify mutants world results demo replay check clean
+.PHONY: help install test verify mutants world results ablate demo replay check clean
 
 PY ?= python
 
@@ -9,6 +9,7 @@ help:
 	@echo "mutants   mutate the regulation and confirm the suite catches it"
 	@echo "world     generate a mandate book and check it against market base rates"
 	@echo "results   run the evaluation suite on held-out seeds and print the table"
+	@echo "ablate    isolate which part of the allocator earns the number"
 	@echo "demo      kill -9 a live batch mid-flight and prove zero double-debits"
 	@echo "replay    reconstruct the last demo run from the journal"
 	@echo "check     test + verify + mutants — the full compliance gate"
@@ -31,6 +32,9 @@ world:
 
 results:
 	$(PY) -m mandate_recovery.eval.report --seeds 100-109 --mandates 1500 --json docs/public/results.json
+
+ablate:
+	$(PY) -m mandate_recovery.eval.ablation --seeds 100-104 --mandates 800
 
 demo:
 	$(PY) -m demo.crash_demo

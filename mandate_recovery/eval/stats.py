@@ -36,8 +36,17 @@ class PairedComparison:
 
     @property
     def significant(self) -> bool:
-        """The interval excludes zero. Point estimates alone prove nothing."""
-        return (self.ci_low > 0.0) or (self.ci_high < 0.0)
+        """Both the interval and the signed-rank test, where both exist.
+
+        They can disagree: a bootstrap interval on ten paired differences
+        excluded zero while Wilcoxon returned p = 0.084 on the same data. Taking
+        whichever agrees would be picking the answer, so a result counts only
+        when both do.
+        """
+        interval = (self.ci_low > 0.0) or (self.ci_high < 0.0)
+        if np.isnan(self.p_value):
+            return interval
+        return interval and self.p_value < 0.05
 
     def render(self, unit: str = "") -> str:
         star = "*" if self.significant else " "

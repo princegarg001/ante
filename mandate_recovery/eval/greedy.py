@@ -40,6 +40,7 @@ from typing import Final, Mapping, Sequence
 
 import numpy as np
 
+from ..belief.filter import PhaseBelief, PhaseProfile
 from ..core.money import Paise
 from ..core.types import TERMINAL_CAUSES, Action, Commit, Stop
 from ..predict.features import FeatureContext, IssuerTracker, extract
@@ -69,6 +70,15 @@ class GreedyEV:
     model: TrainedModel
     calendar: Calendar
     issuer_of: dict[str, str] = field(default_factory=dict)
+    #: B2 carries the same pay-cycle posterior the allocator does.
+    #:
+    #: This is not generosity, it is the whole point of the ablation. The model
+    #: is trained with the belief score and its entropy among the features, so a
+    #: B2 that passed zeros would be handicapped on *information* — and the gap
+    #: to the allocator would then partly measure "I know something you do not"
+    #: rather than "treating slots as scarce is worth something". The comparison
+    #: has to differ in exactly one thing.
+    profile: PhaseProfile | None = None
     name: str = "B2 · greedy EV, no budget reasoning"
 
     _issuers: IssuerTracker = field(default_factory=IssuerTracker)
@@ -76,6 +86,7 @@ class GreedyEV:
     _last_failure: dict[str, datetime] = field(default_factory=dict)
     _decided_at_attempt: dict[str, int] = field(default_factory=dict)
     _target: dict[str, tuple[int, int]] = field(default_factory=dict)
+    _beliefs: dict[str, PhaseBelief] = field(default_factory=dict)
 
     def reset(self, seed: int) -> None:
         self._issuers = IssuerTracker()
@@ -83,6 +94,7 @@ class GreedyEV:
         self._last_failure.clear()
         self._decided_at_attempt.clear()
         self._target.clear()
+        self._beliefs.clear()
 
     # -- policy ------------------------------------------------------------
 
@@ -125,6 +137,11 @@ class GreedyEV:
             self._last_failure.setdefault(
                 c.mandate_id, self.calendar.time_of(c.last_failure_slot)
             )
+            belief = (
+                self._beliefs.setdefault(c.mandate_id, PhaseBelief(self.profile))
+                if self.profile is not None
+                else None
+            )
             rows = np.vstack(
                 [
                     extract(
@@ -136,6 +153,11 @@ class GreedyEV:
                             now=now,
                             last_failure_at=self._last_failure[c.mandate_id],
                             issuers=self._issuers,
+                            belief_day_score=(
+                                belief.probability(self.calendar.time_of(slot).day)
+                                if belief else 0.0
+                            ),
+                            belief_entropy_bits=belief.entropy_bits if belief else 0.0,
                         )
                     )
                     for slot, r in options
@@ -192,6 +214,9 @@ class GreedyEV:
         issuer = self.issuer_of.get(mandate_id)
         if issuer is not None:
             self._issuers.observe(issuer, ok)
+        if self.profile is not None:
+            belief = self._beliefs.setdefault(mandate_id, PhaseBelief(self.profile))
+            belief.update(self.calendar.time_of(self.calendar.slot_of(executed_at)).day, ok)
         if not ok:
             self._last_failure[mandate_id] = executed_at
 

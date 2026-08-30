@@ -49,6 +49,15 @@ FEATURE_NAMES: Final[tuple[str, ...]] = (
     "issuer_attempts_seen",
     "is_variable_amount",
     "is_raised_ceiling_category",
+    # The pay-cycle posterior, and how much to trust it.
+    #
+    # Measured on held-out ground truth, the posterior is worth nothing on the
+    # first decision and six to nine points from the second onward. Passing the
+    # entropy alongside the score lets the model learn that relationship instead
+    # of it being hand-coded as a rule: a diffuse belief and a sharp one are
+    # different features, not the same feature with different noise.
+    "belief_day_score",
+    "belief_entropy_bits",
 )
 
 N_FEATURES: Final[int] = len(FEATURE_NAMES)
@@ -93,6 +102,11 @@ class FeatureContext:
     now: datetime
     last_failure_at: datetime
     issuers: IssuerTracker
+    #: P(clear on this day) under the mandate's phase posterior, and the
+    #: posterior's entropy. Both default to the uninformative values used before
+    #: a profile exists, so the first training pass can run without one.
+    belief_day_score: float = 0.0
+    belief_entropy_bits: float = 0.0
 
 
 def extract(ctx: FeatureContext) -> np.ndarray:
@@ -137,6 +151,8 @@ def extract(ctx: FeatureContext) -> np.ndarray:
             np.log1p(ctx.issuers.seen(issuer)),
             float(ctx.state.variable_amount_allowed),
             float(ctx.state.category is not Category.STANDARD),
+            float(ctx.belief_day_score),
+            float(ctx.belief_entropy_bits),
         ],
         dtype=np.float64,
     )

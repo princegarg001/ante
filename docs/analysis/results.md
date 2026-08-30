@@ -1,9 +1,8 @@
 # Results
 
 ::: tip Status
-Baselines, the calibrated survival model and the lawful clairvoyant are measured. **The
-allocator is not built yet** — its row is deliberately absent rather than estimated. It
-arrives on days 6–7, and it has to beat B2's 14.4% of headroom, not B1.
+Complete: baselines, the calibrated survival model, the allocator, and the lawful
+clairvoyant, all measured on held-out seeds.
 :::
 
 Ten held-out seeds, 1,500 mandates each, paired on common random numbers. Reproduce with
@@ -42,10 +41,10 @@ a judgement it never made.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | B0 · no retry | ₹0 | ₹0 | 0.0% | 0 | 81.5% | 0 | 0 |
 | **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,799** | 29.4% | 90 | 78.9% | 70 | 0 |
-| **B2 · greedy EV, no budget reasoning** | ₹1,89,927 | **₹1,86,848** | 33.6% | 123 | 78.8% | 70 | 0 |
+| **B2 · greedy EV, no budget reasoning** | ₹2,05,943 | **₹2,03,107** | 36.4% | 145 | 78.0% | 70 | 0 |
 | B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,549 | 20.6% | 60 | 79.8% | 0 | **746** |
 | *oracle · clairvoyant, lawful* | *₹3,31,609* | *₹3,30,356* | *58.7%* | *530* | *80.6%* | *169* | *0* |
-| **the allocator** | — | — | — | — | — | — | — |
+| **allocator · priced DP with option value** | ₹2,17,993 | **₹2,15,289** | 38.6% | 161 | 77.8% | 155 | 0 |
 
 </div>
 
@@ -60,7 +59,8 @@ and ₹0.50 per contact. Those are modelling choices, stated rather than buried.
 | vs B1 | Mean difference | 95% bootstrap CI | p | Seeds won |
 | --- | ---: | :---: | ---: | ---: |
 | B0 · no retry | −₹1,62,799 | [−170,023, −156,802] | 0.0020 | 0/10 |
-| **B2 · greedy EV** | **+₹24,049** | [+19,071, +28,892] | 0.0020 | **10/10** |
+| **B2 · greedy EV** | **+₹40,308** | [+33,860, +46,898] | 0.0020 | **10/10** |
+| **allocator** | **+₹52,490** | [+44,363, +60,967] | 0.0020 | **10/10** |
 | B3 · Stripe-style | −₹50,250 | [−53,986, −46,384] | 0.0020 | 0/10 |
 | oracle | +₹1,67,558 | [+162,506, +172,920] | 0.0020 | 10/10 |
 
@@ -128,14 +128,70 @@ Its most telling column is **₹530 recovered per attempt against B1's ₹90**. 
 money is there means one well-timed presentation instead of three speculative ones. That gap
 is the allocation thesis, visible before the allocator exists.
 
-When the allocator lands, the number to report is:
-
 ```
-recovery efficiency = (allocator − B1) / (oracle − B1)
+recovery efficiency = (policy − B1) / (oracle − B1)
 ```
 
-"We captured N% of what any lawful policy could have" bounds what is left on the table.
-"We beat the heuristic by N%" does not.
+| Policy | Recovery efficiency |
+| --- | ---: |
+| B3 · Stripe-style | −30.0% |
+| B2 · greedy EV | 24.1% |
+| **allocator** | **31.3%** |
+
+"We captured 31% of what any lawful policy could have" bounds what is left on the table.
+"We beat the heuristic by 32%" does not.
+
+## Which idea earned the number
+
+The allocator adds three things at once — backward induction over the remaining budget, an
+option-value term for the mandate, and a shadow price on scarce execution windows. It would
+be easy to credit whichever sounds best. Turning the capacity constraint off answers it, and
+the answer was not the expected one.
+
+```
+$ make ablate
+
+  arm                                       net value    rate  attempts  stops
+  B1 · fixed schedule                        ₹89,604    31.3%       956     45
+  B2 · greedy EV, same model and belief    ₹1,12,134    38.8%       771     45
+  allocator · capacity unlimited           ₹1,14,103    39.5%       836     45
+  allocator · capacity loose               ₹1,22,435    42.3%       791     45
+  allocator · capacity default             ₹1,27,109    43.9%       753     59
+  allocator · capacity tight               ₹1,22,639    42.4%       777     52
+
+  dynamic programme + option value, no price     +₹1,969
+  adding the capacity price                     +₹13,005
+```
+
+**With capacity unlimited the allocator is barely distinguishable from greedy.** The dynamic
+programme and the option-value term, on their own, are worth close to nothing here. Almost
+all of the gain comes from the price.
+
+That is a sharper claim than the one it replaced. The shadow price is not just rationing a
+scarce resource — it acts as a **selectivity threshold**. An attempt must clear a price to be
+worth making, so marginal opportunities are refused and the budget concentrates where the
+expected value clearly beats it. The evidence is the shape of the response: value peaks at an
+intermediate capacity and falls away on *both* sides. Too loose and nothing is filtered; too
+tight and opportunities worth taking are priced out.
+
+::: warning Caveat on this ablation
+Run on five seeds, where the signed-rank test is not computed — the intervals are bootstrap
+only. The direction is consistent across every arm and every seed, but the ₹1,969 figure in
+particular deserves ten seeds before it is quoted as precise.
+:::
+
+## An ablation that had to be fixed first
+
+The allocator's margin over B2 was originally **+₹53,497**. That number was wrong.
+
+The survival model is trained with the pay-cycle belief among its features. The allocator
+supplied them; B2 passed zeros. So part of the measured gap was *"I have information you do
+not"* rather than *"allocation is worth something"* — which corrupts the one comparison the
+whole project rests on.
+
+With B2 given the identical belief, the gap is **+₹12,182** [+6,996, +16,953], p = 0.0059,
+9/10 seeds. Sixty percent smaller, and the honest number. A comparison has to differ in
+exactly one thing.
 
 ::: warning The oracle is a strong achievable policy, not a proven supremum
 It commits to the single best reachable slot rather than searching every sequence of up to

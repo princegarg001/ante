@@ -60,7 +60,7 @@ commit — it says what runs, not what is planned.
 | `eval/` — harness, baselines B0/B1/B3, lawful oracle, paired stats | **done** |
 | `predict/` — calibrated monotone survival model | **done** |
 | `belief/` — EM-fitted pay-cycle phase filter | **done** |
-| `policy/` — the allocator | not started |
+| `policy/` — priced DP allocator with option value | **done** |
 | `ingest/` — Razorpay test-mode webhooks | not started |
 | `diagnose/` — rules ratchet + LLM adjudicator | not started |
 
@@ -155,8 +155,7 @@ into the constraint layer, every domain type frozen
 
 ## Measured recovery
 
-Ten held-out seeds, 1,500 mandates each, paired on common random numbers. The allocator is not
-built yet, so its row is absent rather than estimated.
+Ten held-out seeds, 1,500 mandates each, paired on common random numbers.
 
 ```
 $ make results
@@ -164,13 +163,17 @@ $ make results
   policy                                    recovered    net value    rate  ₹/attempt  survived  illegal
   B0 · no retry                                 ₹0.00        ₹0.00   0.0%          0     81.5%        0
   B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90     78.9%        0
-  B2 · greedy EV, no budget reasoning    ₹1,89,927.20 ₹1,86,847.60  33.6%        123     78.8%        0
+  B2 · greedy EV, no budget reasoning    ₹2,05,943.00 ₹2,03,106.80  36.4%        145     78.0%        0
   B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60     79.8%      746
+  allocator · priced DP with option value ₹2,17,993.10 ₹2,15,288.50  38.6%        161     77.8%        0
   oracle · clairvoyant, lawful           ₹3,31,608.72 ₹3,30,356.12  58.7%        530     80.6%        0
 
   vs B1, paired difference in net value, 95% bootstrap CI
-  B2 · greedy EV                     +24,049 ₹  [+19,071, +28,892]  p=0.0020  10/10 seeds
+  B2 · greedy EV                     +40,308 ₹  [+33,860, +46,898]  p=0.0020  10/10 seeds
+  allocator                          +52,490 ₹  [+44,363, +60,967]  p=0.0020  10/10 seeds
   B3 · Stripe-style                  -50,250 ₹  [-53,986, -46,384]  p=0.0020  0/10 seeds
+
+  recovery efficiency against the lawful clairvoyant: 31.3%
   oracle · clairvoyant, lawful      +167,558 ₹  [+162,506, +172,920] p=0.0020  10/10 seeds
 ```
 
@@ -179,9 +182,24 @@ $ make results
 twice — illegal proposals are refused and not executed, so it is scored on what it could
 lawfully achieve. Most of what it wants to do simply is not available here.
 
-**Headroom to a lawful clairvoyant is ₹1,67,558.** The oracle recovers ₹530 per attempt
-against B1's ₹90 — one well-timed presentation instead of three speculative ones. That gap is
-the allocation thesis, visible before the allocator exists.
+**Headroom to a lawful clairvoyant is ₹1,67,558**, of which the allocator captures 31.3%.
+
+**Which idea earned it.** The allocator adds three things at once — backward induction over
+the budget, an option-value term, and a shadow price on scarce windows. Turning the capacity
+constraint off isolates them, and the answer was not the expected one:
+
+```
+$ make ablate
+
+  dynamic programme + option value, no price     +₹1,969
+  adding the capacity price                     +₹13,005
+```
+
+With capacity unlimited the allocator is barely distinguishable from greedy. Almost all the
+gain is the price — which acts less as rationing than as a **selectivity threshold**: an
+attempt must clear a price to be worth making. Value peaks at an intermediate capacity and
+falls away on both sides, which is what a threshold looks like and what mere rationing does
+not.
 
 Full detail, method and caveats: [Results](https://princegarg001.github.io/ante/analysis/results).
 

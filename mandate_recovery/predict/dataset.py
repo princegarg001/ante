@@ -37,6 +37,7 @@ from ..core.clock import IST, SLOTS_PER_DAY
 from ..core.money import Paise
 from ..core.types import Action, Commit, MandateState
 from ..eval.policy import Calendar, Candidate
+from ..belief.filter import PhaseBelief, PhaseProfile
 from .features import FeatureContext, IssuerTracker, extract
 
 MIN_LEAD_SLOTS: Final[int] = 48
@@ -71,6 +72,10 @@ class ExplorationPolicy:
     _issuers: IssuerTracker = field(default_factory=IssuerTracker)
     #: mandate_id -> issuer code, supplied by the collector.
     issuer_of: dict[str, str] = field(default_factory=dict)
+    #: Supplied on the second pass. Without it the belief features stay at their
+    #: uninformative defaults, which is exactly what the first pass needs.
+    profile: PhaseProfile | None = None
+    _beliefs: dict[str, PhaseBelief] = field(default_factory=dict)
     _pending: dict[str, tuple[int, np.ndarray]] = field(default_factory=dict)
     _reference: dict[str, Paise] = field(default_factory=dict)
     _last_failure: dict[str, datetime] = field(default_factory=dict)
@@ -86,6 +91,7 @@ class ExplorationPolicy:
         self._reference.clear()
         self._last_failure.clear()
         self._release_slot.clear()
+        self._beliefs.clear()
 
     # -- policy ------------------------------------------------------------
 
@@ -121,6 +127,7 @@ class ExplorationPolicy:
                 c.mandate_id, self.calendar.time_of(c.last_failure_slot)
             )
 
+            score, entropy = self._belief_features(c.mandate_id, slot)
             row = extract(
                 FeatureContext(
                     state=c.state,
@@ -130,6 +137,8 @@ class ExplorationPolicy:
                     now=now,
                     last_failure_at=self._last_failure[c.mandate_id],
                     issuers=self._issuers,
+                    belief_day_score=score,
+                    belief_entropy_bits=entropy,
                 )
             )
             self._pending[c.mandate_id] = (slot, row)
@@ -150,10 +159,20 @@ class ExplorationPolicy:
         self.rows.append(row)
         self.labels.append(int(ok))
         self.groups.append(mandate_id)
+        if self.profile is not None:
+            belief = self._beliefs.setdefault(mandate_id, PhaseBelief(self.profile))
+            belief.update(executed_at.astimezone(self.calendar.origin.tzinfo).day, ok)
         if not ok:
             self._last_failure[mandate_id] = executed_at
 
     # -- internals ---------------------------------------------------------
+
+    def _belief_features(self, mandate_id: str, slot: int) -> tuple[float, float]:
+        if self.profile is None:
+            return 0.0, 0.0
+        belief = self._beliefs.setdefault(mandate_id, PhaseBelief(self.profile))
+        day = self.calendar.time_of(slot).day
+        return belief.probability(day), belief.entropy_bits
 
     def _issuers_observe(self, mandate_id: str, ok: bool) -> None:
         issuer = self.issuer_of.get(mandate_id)
@@ -190,6 +209,7 @@ def collect(
     seeds: Sequence[int],
     config,
     origin: datetime | None = None,
+    profile: "PhaseProfile | None" = None,
 ) -> Dataset:
     """Run exploration across the training seeds and return the labelled rows."""
     from ..eval.harness import run_policy
@@ -208,6 +228,7 @@ def collect(
             cal,
             seed=seed,
             issuer_of={m.mandate_id: ISSUERS[m.issuer].code for m in world.mandates},
+            profile=profile,
         )
         run_policy(policy, world)
         rows.extend(policy.rows)

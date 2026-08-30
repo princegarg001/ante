@@ -6,10 +6,10 @@ planned — the distinction is the point.
 ## Current state
 
 <div class="stat-grid">
-  <div class="stat ok"><span class="v">202</span><span class="k">tests passing</span></div>
+  <div class="stat ok"><span class="v">240</span><span class="k">tests passing</span></div>
   <div class="stat ok"><span class="v">2.5 M</span><span class="k">triples verified</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">4 / 12</span><span class="k">days elapsed</span></div>
+  <div class="stat"><span class="v">6 / 12</span><span class="k">days elapsed</span></div>
 </div>
 
 <div class="table-scroll">
@@ -27,7 +27,9 @@ planned — the distinction is the point.
 | `sim/` — latent balance process, issuer downtime, churn | ✅ **done** |
 | `sim/calibrate.py` — base-rate gate against market data | ✅ **done** |
 | `eval/` — harness, baselines B0/B1/B3, lawful oracle, paired stats | ✅ **done** |
-| `belief/`, `predict/`, `policy/` — the allocator | not started |
+| `predict/` — calibrated monotone survival model | ✅ **done** |
+| `belief/` — EM-fitted pay-cycle phase filter | ✅ **done** |
+| `policy/` — priced DP allocator with option value | ✅ **done** |
 | `ingest/` — Razorpay test-mode webhooks | not started |
 | `diagnose/` — rules ratchet + LLM adjudicator | not started |
 
@@ -46,8 +48,8 @@ day 10, not day 13.
 | 2 | 26 Aug | Action layer: WAL, idempotency, ceilings, kill switch, hash-chained receipts | ✅ real `kill -9` → restart → zero duplicates, in CI |
 | 3 | 27 Aug | Simulator: latent balance process, issuer downtime, churn, stop-list | ✅ base rates gated in CI across seeds |
 | 4 | 28 Aug | Eval harness, B0/B1/B3 baselines, common random numbers, oracle policy | ✅ [results table](/analysis/results) with paired bootstrap intervals |
-| 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | Reliability diagram and EV(a) curve |
-| 6 | 30 Aug | **Policy: per-mandate DP** | Beats B1 on a single seed |
+| 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | ✅ calibrated, ECE 0.023, B2 beats B1 |
+| 6 | 30 Aug | **Policy: per-mandate DP, prices, auction** | ✅ +₹52,490 vs B1 on 10/10 seeds, 31.3% of headroom |
 | 7 | 31 Aug | **Dual ascent and slot auction**, B2/B3 baselines | Auction book prints; B3 violation count published |
 | 8 | 1 Sept | Diagnosis: rules ratchet, LLM adjudicator, disagreement log | Confusion matrix |
 | 9 | 2 Sept | Razorpay test-mode webhooks, signature verification, red-team suite | Real `payment.failed` → decision |
