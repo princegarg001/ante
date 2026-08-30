@@ -7,9 +7,9 @@ problem is being solved, and any design that treats them as filters is solving t
 ## C5 · The commit aperture is two-sided
 
 The first draft of this project modelled the notification rule as `execute_at >= now + 24h`:
-a floor, a minimum delay. That is the natural reading, and it is wrong in a way that matters.
+a floor, a minimum delay. That is the natural reading, and it misses half the structure.
 
-The actual rule is bounded at both ends:
+The aperture is bounded at both ends:
 
 ```
 commit_time  ∈  [ T − 48h ,  T − 24h ]
@@ -18,6 +18,20 @@ commit_time  ∈  [ T − 48h ,  T − 24h ]
 You cannot notify a week early, and you cannot notify late. For every candidate execution time
 there is exactly one 24-hour-wide interval during which it can be chosen, and outside that
 interval it is unreachable.
+
+::: warning Where each half comes from — corrected 31 August
+The **floor is regulation**: NPCI validates a 24-hour minimum.
+
+The **ceiling is not**. It comes from payment providers, and they disagree — Decentro quotes
+24–48h, Setu and PayU 36–48h, others 48–72h. Three different ceilings cannot be the same rule.
+
+The aperture is still real, because a merchant on a given PSP genuinely cannot notify earlier
+than that provider allows, so this is the environment a merchant faces and the structure the
+allocator must plan against. What is not supportable is the sentence *"NPCI mandates a 48-hour
+ceiling."* The honest form is *"the floor is regulatory, the ceiling is our PSP's."*
+
+Full reasoning on [Verification status](/constraints/sources#the-substantive-correction-the-48-hour-ceiling-is-not-regulation).
+:::
 
 <div class="diagram">
 <svg viewBox="0 0 720 200" role="img" aria-label="Two candidate execution times, each with its own commit aperture, showing that the apertures slide with the target">
@@ -119,14 +133,31 @@ V  =  E[ rupees recovered this cycle ]
 ```
 
 `L` is the mandate's continuation value — expected discounted net revenue over its remaining
-life. For a ₹499 monthly plan with fourteen months of expected life remaining, `L` is roughly
-**fourteen times** the amount being chased.
+life. The allocator uses **8×** the amount due, and prices each attempt against a revocation
+hazard **measured rather than assumed**: B1 spends three extra presentations per mandate and
+ends with 78.9% of the batch unrevoked against B0's 81.5%, which implies **0.87% per attempt**.
 
 <div class="stat-grid">
   <div class="stat"><span class="v">₹499</span><span class="k">amount at stake this cycle</span></div>
-  <div class="stat"><span class="v">≈ ₹7,000</span><span class="k">continuation value at risk</span></div>
-  <div class="stat"><span class="v">14×</span><span class="k">ratio of collateral to prize</span></div>
+  <div class="stat"><span class="v">≈ ₹4,000</span><span class="k">continuation value at risk</span></div>
+  <div class="stat"><span class="v">8×</span><span class="k">ratio of collateral to prize</span></div>
+  <div class="stat"><span class="v">0.87%</span><span class="k">hazard per attempt, measured</span></div>
 </div>
+
+::: warning How much this term actually moves the policy — measured
+Less than the framing implies, and it is worth saying so. At the measured hazard an attempt
+risks about 0.08x the debit to win roughly 0.3x, so option value is a real brake but not a
+dramatic one — the allocator attempts *more* than the fixed-schedule baseline, not less.
+
+An earlier version of the allocator used an invented hazard of 5.5%. At that value an attempt
+risks 0.44x to win 0.3x, and it correctly refused all 408 mandates in the batch and scored
+zero. The arithmetic was right; the input was made up.
+
+The [ablation](/analysis/results#which-idea-earned-the-number) goes further: with capacity
+unlimited, the dynamic programme and this option-value term together are worth about ₹1,969
+against greedy, while the capacity price is worth ₹13,005. The collateral framing is true and
+it is not where the money comes from.
+:::
 
 That ratio is the entire argument for stopping, and it is why an agent optimising recovery
 alone is the wrong agent. It is also the mechanism behind twenty million monthly revocations:

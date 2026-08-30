@@ -238,6 +238,21 @@
   background: color-mix(in srgb, var(--ante-warn) 16%, transparent);
 }
 
+.pill.attributed {
+  color: var(--ante-ok);
+  background: color-mix(in srgb, var(--ante-ok) 12%, transparent);
+}
+
+.pill.provider {
+  color: var(--ante-warn);
+  background: color-mix(in srgb, var(--ante-warn) 16%, transparent);
+}
+
+.pill.disputed {
+  color: var(--ante-bad);
+  background: color-mix(in srgb, var(--ante-bad) 16%, transparent);
+}
+
 .pill.derived {
   color: var(--ante-ink-dim);
   background: color-mix(in srgb, var(--ante-ink-dim) 16%, transparent);

@@ -4,12 +4,21 @@ Every rule the engine enforces, with its source and verification status. This pa
 authority; the code in `mandate_recovery/constraints/rules.py` implements it, and the rule
 identifiers below appear verbatim in every veto the system emits.
 
-::: warning Nothing here is law until it says PRIMARY
-Rows marked <span class="pill secondary">secondary</span> were established from law-firm
-notes, PSP developer documentation or press reporting. They must be re-confirmed against the
-NPCI or RBI circular before any of it is quoted as fact. Progress is tracked in
-[Verification status](/constraints/sources).
+::: warning Read the status column
+A verification pass on 31 August identified both instruments by number and moved most rows to
+<span class="pill attributed">attributed</span> — quoted consistently by independent legal
+analyses and traceable to a numbered circular, though the circular itself is not yet in hand.
+
+Five rows remain <span class="pill provider">provider</span>: established only from one
+payment provider's API documentation, and possibly that provider's implementation rather than
+regulation. One row is <span class="pill disputed">disputed</span> outright.
+
+Which rows, and what it changes, is on [Verification status](/constraints/sources).
 :::
+
+**Instruments.** RBI/DPSS/2026-27/396, *Digital Payments – E-mandate Framework, 2026*
+(21 April 2026, ss. 10(2) r/w 18 PSS Act 2007). NPCI/UPI/OC/215A/2025-26, *Guidelines on
+usage of UPI API* (21 May 2025, enforced 1 August 2025).
 
 ## Two kinds of rule
 
@@ -38,10 +47,10 @@ operations would.
 
 | ID | Constraint | Value | Source | Status |
 | --- | --- | --- | --- | --- |
-| <span class="rule reg">C1</span> | Retry cap | 1 execution + 3 retries per mandate per sequence number | NPCI UPI/API Guidelines, notified 21 May 2025, enforced 1 Aug 2025 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C2</span> | Peak hours — execution barred | 10:00–13:00 and 17:00–21:30 IST | Same | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C1</span> | Retry cap | 1 execution + 3 retries per mandate per sequence number | NPCI UPI/API Guidelines, notified 21 May 2025, enforced 1 Aug 2025 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C2</span> | Peak hours — execution barred | 10:00–13:00 and 17:00–21:30 IST | Same | <span class="pill attributed">attributed</span> |
 | <span class="rule reg">C3</span> | Non-peak — execution permitted | 00:00–10:00, 13:00–17:00, 21:30–24:00 IST (16.5 h/day) | Derived from C2 | <span class="pill derived">derived</span> |
-| <span class="rule reg">C4</span> | Throughput | Initiator PSPs must execute at a "moderated TPS"; rate limits apply | Same | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C4</span> | Throughput | Initiator PSPs must execute at a "moderated TPS"; rate limits apply | Same | <span class="pill attributed">attributed</span> |
 
 </div>
 
@@ -51,14 +60,15 @@ operations would.
 
 | ID | Constraint | Value | Source | Status |
 | --- | --- | --- | --- | --- |
-| <span class="rule reg">C5</span> | Notification aperture | Must be raised within **[T−48h, T−24h]**. NPCI validates the 24 h minimum | PSP developer docs (Decentro, Setu, PayU, Juspay) | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C6</span> | Notification is a prerequisite | Without an accepted notification the execution API is rejected (`PRE_DEBIT_NOTIFICATION_NOT_FOUND` / `_NOT_SENT`, HTTP 422). No charge is attempted | PSP developer docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C7</span> | Late cut-off | A notification received at or after 23:50 IST is rejected for a T+1 execution | Decentro docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C8</span> | One pending notification | Creating a new one marks all previous pending notifications for that mandate `Cancelled` | Decentro docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C10</span> | Instant exemption | No notification required if presentation occurs within 5 minutes of registration | Decentro docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C11</span> | Category exemption | FASTag and RuPay NCMC auto-replenishment are exempt from the 24 h notification | RBI E-mandate Framework 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C13</span> | Notification contents | Merchant name, amount, date and time of debit, mandate reference, reason for debit | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C14</span> | Post-debit notification | Required after every debit | RBI 2026 | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C5a</span> | Notification **minimum** lead | ≥ 24 h before execution; NPCI validates this | NPCI/UPI/OC/215A/2025-26 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C5b</span> | Notification **maximum** lead | 48 h — **not in the circular**. Providers quote 24–48h, 36–48h and 48–72h | PSP docs, mutually inconsistent | <span class="pill disputed">disputed</span> |
+| <span class="rule reg">C6</span> | Notification is a prerequisite | Without an accepted notification the execution API is rejected (`PRE_DEBIT_NOTIFICATION_NOT_FOUND` / `_NOT_SENT`, HTTP 422). No charge is attempted | PSP developer docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C7</span> | Late cut-off | A notification received at or after 23:50 IST is rejected for a T+1 execution | Decentro docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C8</span> | One pending notification | Creating a new one marks all previous pending notifications for that mandate `Cancelled` | Decentro docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C10</span> | Instant exemption | No notification required if presentation occurs within 5 minutes of registration | Decentro docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C11</span> | Category exemption | FASTag and RuPay NCMC auto-replenishment are exempt from the 24 h notification | RBI E-mandate Framework 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C13</span> | Notification contents | Merchant name, amount, date and time of debit, mandate reference, reason for debit | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C14</span> | Post-debit notification | Required after every debit | RBI 2026 | <span class="pill attributed">attributed</span> |
 
 </div>
 
@@ -68,11 +78,11 @@ operations would.
 
 | ID | Constraint | Value | Source | Status |
 | --- | --- | --- | --- | --- |
-| <span class="rule reg">C9</span> | First-presentation failure | If the **first** presentation fails, the mandate is automatically revoked | Decentro docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C12</span> | Mandate must be LIVE | Notification may only be raised against a `LIVE` mandate | PSP docs | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C17</span> | AFA on lifecycle events | Registration, modification and withdrawal each require an additional factor of authentication | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C18</span> | Opt-out | Customer may modify or withdraw at any time, subject to AFA; the pre-transaction notice must carry an opt-out | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C21</span> | Validity period | Every e-mandate must specify one | RBI 2026 | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C9</span> | First-presentation failure | If the **first** presentation fails, the mandate is automatically revoked | Decentro docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C12</span> | Mandate must be LIVE | Notification may only be raised against a `LIVE` mandate | PSP docs | <span class="pill provider">provider</span> |
+| <span class="rule reg">C17</span> | AFA on lifecycle events | Registration, modification and withdrawal each require an additional factor of authentication | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C18</span> | Opt-out | Customer may modify or withdraw at any time, subject to AFA; the pre-transaction notice must carry an opt-out | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C21</span> | Validity period | Every e-mandate must specify one | RBI 2026 | <span class="pill attributed">attributed</span> |
 
 </div>
 
@@ -82,10 +92,10 @@ operations would.
 
 | ID | Constraint | Value | Source | Status |
 | --- | --- | --- | --- | --- |
-| <span class="rule reg">C15</span> | AFA-free ceiling | ₹15,000 per recurring transaction | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C16</span> | Raised ceiling | ₹1,00,000 for insurance premiums, mutual-fund SIPs, credit-card bills | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C19</span> | Variable mandates | Customer sets a maximum transaction value; any amount up to that cap may be debited without re-authentication | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C20</span> | Zero customer charges | No charge may be levied on the customer for the e-mandate facility | RBI 2026 | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C15</span> | AFA-free ceiling | ₹15,000 per recurring transaction | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C16</span> | Raised ceiling | ₹1,00,000 for insurance premiums, mutual-fund SIPs, credit-card bills | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C19</span> | Variable mandates | Customer sets a maximum transaction value; any amount up to that cap may be debited without re-authentication | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C20</span> | Zero customer charges | No charge may be levied on the customer for the e-mandate facility | RBI 2026 | <span class="pill attributed">attributed</span> |
 
 </div>
 
@@ -95,9 +105,9 @@ operations would.
 
 | ID | Constraint | Value | Source | Status |
 | --- | --- | --- | --- | --- |
-| <span class="rule reg">C22</span> | Grievance redressal | A mechanism must exist | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C23</span> | Acquirer duty | Acquirers must ensure merchant compliance | RBI 2026 | <span class="pill secondary">secondary</span> |
-| <span class="rule reg">C24</span> | Applicability | All PSPs and participants processing recurring domestic and cross-border transactions via cards, PPIs and UPI | RBI 2026 | <span class="pill secondary">secondary</span> |
+| <span class="rule reg">C22</span> | Grievance redressal | A mechanism must exist | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C23</span> | Acquirer duty | Acquirers must ensure merchant compliance | RBI 2026 | <span class="pill attributed">attributed</span> |
+| <span class="rule reg">C24</span> | Applicability | All PSPs and participants processing recurring domestic and cross-border transactions via cards, PPIs and UPI | RBI 2026 | <span class="pill attributed">attributed</span> |
 | <span class="rule reg">RATCHET</span> | Terminal-cause ratchet | No debit retry against a revoked, expired or otherwise terminal mandate | Derived from C18 and merchant duty | <span class="pill derived">derived</span> |
 
 </div>

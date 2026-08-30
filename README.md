@@ -20,10 +20,16 @@ two weeks.
 ## The problem actually in front of you
 
 NPCI allows **one execution plus three retries** per mandate per cycle, **only outside**
-10:00–13:00 and 17:00–21:30 IST. RBI requires a pre-debit notification, and it must be raised
-in a **two-sided window** — no earlier than 48 hours and no later than 24 hours before the
-debit. Only **one such notification may be pending per mandate** at a time: raising a new one
-cancels the old. And if the first presentation on a mandate fails, the mandate is revoked.
+10:00–13:00 and 17:00–21:30 IST. A pre-debit notification must be raised no later than 24
+hours before the debit — and no earlier than the PSP's own ceiling, so the commit window is
+**two-sided in practice**. Only **one such notification may be pending per mandate** at a
+time: raising a new one cancels the old. And a failed first presentation can revoke the
+mandate outright.
+
+Each of those claims carries a verification status rather than being asserted flat — the
+24-hour floor is regulation, the ceiling is the provider's, and two of the rules are
+established from a single provider's documentation. See
+[Verification status](https://princegarg001.github.io/ante/constraints/sources).
 
 Put together:
 

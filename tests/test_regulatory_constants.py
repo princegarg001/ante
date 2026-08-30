@@ -14,6 +14,13 @@ between a value being configured and a value being *claimed*.
 Sources are tracked per-row in COMPLIANCE.md. If a row there is corrected during
 primary-source verification, this file is where the change has to be made, and the
 diff will show a regulation being restated rather than a constant being tweaked.
+
+Instruments, as identified on 31 August 2026:
+
+    RBI/DPSS/2026-27/396         Digital Payments - E-mandate Framework, 2026
+                                 21 April 2026, ss. 10(2) r/w 18 PSS Act 2007
+    NPCI/UPI/OC/215A/2025-26     Guidelines on usage of UPI API
+                                 21 May 2025, enforced from 1 August 2025
 """
 
 from __future__ import annotations
@@ -60,12 +67,32 @@ def test_c3_non_peak_capacity_is_sixteen_and_a_half_hours_a_day() -> None:
     assert SLOT_MINUTES == 30
 
 
-def test_c5_notification_aperture_is_two_sided_24h_to_48h() -> None:
-    """The constraint the first draft of the build plan got wrong: it modelled the
-    rule as `execute_at >= now + 24h`, a floor with no ceiling. Notifying too early
-    is as non-compliant as notifying too late."""
+def test_c5a_notification_minimum_is_twenty_four_hours() -> None:
+    """NPCI/UPI/OC/215A/2025-26 — NPCI validates the 24h minimum.
+
+    This half is regulation.
+    """
     assert PDN_MIN_LEAD == timedelta(hours=24)
+
+
+def test_c5b_notification_ceiling_is_provider_policy_not_regulation() -> None:
+    """The correction from the 31 August verification pass.
+
+    The upper bound is *not* in the circular. It comes from payment providers,
+    and they disagree: 24-48h, 36-48h and 48-72h are all quoted. Three different
+    ceilings cannot be the same regulation, so the honest reading is that the
+    floor is regulatory and the ceiling is the provider's.
+
+    The aperture is still real — a merchant on a given PSP genuinely cannot
+    notify earlier than that provider allows — so the two-sided structure the
+    allocator plans against is the environment a merchant faces. What changed is
+    the claim, not the constant. 48h is the tightest commonly quoted ceiling and
+    therefore the conservative choice.
+
+    This test exists so that nobody later cites C5's ceiling as NPCI regulation.
+    """
     assert PDN_MAX_LEAD == timedelta(hours=48)
+    assert PDN_MAX_LEAD > PDN_MIN_LEAD
 
 
 def test_c7_late_notification_cutoff_is_2350_ist() -> None:
