@@ -48,10 +48,10 @@ a judgement it never made.
 | Policy | Recovered | Net value | Rate | ₹/att | Surv | Stops | Escal | Illegal |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | B0 · no retry | ₹0 | ₹0 | 0.0% | 0 | 81% | 0 | 0 | 0 |
-| **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,799** | 29.4% | 90 | 79% | 316 | 0 | 0 |
-| **B2 · greedy EV, no budget reasoning** | ₹1,96,704 | **₹1,93,680** | 34.8% | 130 | 78% | 327 | 0 | 0 |
-| B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,549 | 20.6% | 60 | 80% | 0 | 0 | **966** |
-| **allocator · priced DP with option value** | ₹2,14,496 | **₹2,11,646** | **38.0%** | 151 | 78% | 121 | **256** | 0 |
+| **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,789** | 29.4% | 90 | 79% | 316 | 0 | 0 |
+| **B2 · greedy EV, no budget reasoning** | ₹2,00,085 | **₹1,97,171** | 35.4% | 137 | 78% | 316 | 0 | 0 |
+| B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,539 | 20.6% | 60 | 80% | 0 | 0 | **966** |
+| **allocator · priced DP with option value** | ₹2,14,447 | **₹2,11,703** | **37.9%** | 157 | 78% | 146 | **256** | 0 |
 | *oracle · clairvoyant, lawful* | *₹3,31,609* | *₹3,30,356* | *58.7%* | *530* | *81%* | *397* | *0* | *0* |
 
 </div>
@@ -67,8 +67,8 @@ and ₹0.50 per contact. Those are modelling choices, stated rather than buried.
 | vs B1 | Mean difference | 95% bootstrap CI | p | Seeds won |
 | --- | ---: | :---: | ---: | ---: |
 | B0 · no retry | −₹1,62,799 | [−170,023, −156,802] | 0.0020 | 0/10 |
-| **B2 · greedy EV** | **+₹30,881** | [+25,731, +35,943] | 0.0020 | **10/10** |
-| **allocator** | **+₹48,848** | [+42,644, +54,751] | 0.0020 | **10/10** |
+| **B2 · greedy EV** | **+₹34,382** | [+27,829, +40,781] | 0.0020 | **10/10** |
+| **allocator** | **+₹48,914** | [+40,349, +58,253] | 0.0020 | **10/10** |
 | B3 · Stripe-style | −₹50,250 | [−53,986, −46,384] | 0.0020 | 0/10 |
 | oracle | +₹1,67,558 | [+162,506, +172,920] | 0.0020 | 10/10 |
 
@@ -77,7 +77,7 @@ difference is that one of them treats a retry slot as scarce and priced:
 
 | | Mean difference | 95% bootstrap CI | p | Seeds won |
 | --- | ---: | :---: | ---: | ---: |
-| **allocator vs B2** | **+₹17,966** | [+11,174, +25,031] | 0.0020 | **10/10** |
+| **allocator vs B2** | **+₹14,532** | [+4,186, +23,704] | 0.0371 | **9/10** |
 
 </div>
 
@@ -150,11 +150,56 @@ recovery efficiency = (policy − B1) / (oracle − B1)
 | Policy | Recovery efficiency |
 | --- | ---: |
 | B3 · Stripe-style | −30.0% |
-| B2 · greedy EV | 18.4% |
+| B2 · greedy EV | 20.5% |
 | **allocator** | **29.2%** |
 
 "We captured 29% of what any lawful policy could have" bounds what is left on the table.
 "We beat the heuristic by 30%" does not.
+
+## Diagnosis — the agent infers the cause, it does not read it
+
+Until day 9 the policy read the simulator's *true* failure cause. That was defensible —
+the modelled error codes map cleanly onto causes, so a lookup would have produced the same
+answer — but it meant classification error was absent from every reported number, and that
+is not the same thing as it being zero.
+
+The agent now sees the error code the rails returned and infers. Roughly one failure in
+twelve arrives with a code that carries no information — a bank saying "technical decline"
+and nothing more — which is what banks actually do.
+
+```
+  failures classified          25,245
+  accuracy                     92.1%
+  terminal read as recoverable 162  (0.6%)
+  ...of which confidently so   0
+
+    INSUFFICIENT_FUNDS     -> INSUFFICIENT_FUNDS     19,810
+    INSUFFICIENT_FUNDS     -> UNKNOWN                 1,727  <- fails towards uncertainty
+    TRANSIENT_ISSUER       -> TRANSIENT_ISSUER        1,342
+    MANDATE_REVOKED        -> MANDATE_REVOKED         1,050
+    TERMINAL               -> TERMINAL                  707
+    MANDATE_REVOKED        -> UNKNOWN                    77  <- fails towards uncertainty
+```
+
+**The shape of the errors matters more than the rate.** Every single misclassification lands
+on `UNKNOWN` — never on a confident wrong cause. The policy is told *"I do not know"*, never
+*"go ahead"*. A layer that is 95% accurate but whose mistakes point in the dangerous
+direction would be worse than one at 92% that fails safe.
+
+That is enforced structurally by a **one-way ratchet**: a diagnosis may move a cause *into*
+the terminal set, and nothing may move one out. Being wrong in the recoverable direction
+wastes an attempt; being wrong in the terminal direction means retrying a mandate the
+customer has cancelled, which is not a mistake but an abuse. The two are not symmetric and
+the code does not treat them as if they were.
+
+::: warning What this cost
+Adding classification error made the allocator's margin over B2 smaller and less certain —
+from +₹17,966 at p = 0.0020 to **+₹14,532 at p = 0.0371**, and from 10/10 seeds to 9/10.
+Still significant on both the interval and the signed-rank test, and now measured under
+conditions where the agent can be wrong about *why* a debit failed.
+
+The earlier number was not false. It was measured in a world where diagnosis was free.
+:::
 
 ## The stop list, scored
 

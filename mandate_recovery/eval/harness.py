@@ -35,6 +35,7 @@ from ..act.executor import (
 )
 from ..act.journal import Journal
 from ..constraints import is_permitted
+from ..diagnose.rules import diagnose
 from ..constraints.rules import RULES, RuleKind
 from ..core.clock import SLOTS_PER_DAY, is_non_peak
 from ..core.money import Paise, fmt, rupees
@@ -132,6 +133,9 @@ class RunMetrics:
     escalations: dict[str, int] = field(default_factory=dict)
     #: One row per refusal, scored against ground truth after the run.
     stop_ledger: list[StopRecord] = field(default_factory=list)
+    #: (true cause, inferred cause) for every failure the agent observed.
+    #: Scored after the run; the policy only ever sees the inferred one.
+    diagnosis_pairs: list[tuple[str, str]] = field(default_factory=list)
     #: Mandates the policy was never offered — already revoked or expired when
     #: the first epoch ran, or the cycle closed before the notification aperture
     #: could open on them. They are not refusals, and folding them into the stop
@@ -241,6 +245,12 @@ def run_policy(
         result = world.present(m.mandate_id, world.time_of(slot), m.amount_due)
         if not result.ok:
             batch.append(m)
+            metrics.diagnosis_pairs.append(
+                (
+                    result.cause.value if result.cause else "UNKNOWN",
+                    diagnose(result.error_code, result.error_description).cause.value,
+                )
+            )
             metrics.per_mandate[m.mandate_id] = MandateOutcome(
                 mandate_id=m.mandate_id,
                 amount_due=m.amount_due,
@@ -304,6 +314,14 @@ def run_policy(
                 metrics.recovered_paise += result.collected_paise
             else:
                 failure_slot[mid] = slot
+                metrics.diagnosis_pairs.append(
+                    (
+                        result.cause.value if result.cause else "UNKNOWN",
+                        diagnose(
+                            result.error_code, result.error_description
+                        ).cause.value,
+                    )
+                )
 
         # 2b. decision epoch
         if (slot - start) % EPOCH_SLOTS:

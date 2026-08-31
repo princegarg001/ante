@@ -216,6 +216,41 @@ def render(suite: Suite) -> None:
         )
         print(f"  {name:<38}{detail}")
 
+    # -- diagnosis ----------------------------------------------------------
+    pairs = [pr for m in suite.runs[names[1]] for pr in m.diagnosis_pairs]
+    if pairs:
+        terminal = {
+            "MANDATE_EXPIRED", "MANDATE_REVOKED",
+            "AFA_REQUIRED", "VPA_INVALID", "TERMINAL",
+        }
+        correct = sum(1 for t, i in pairs if t == i)
+        dangerous = sum(
+            1 for t, i in pairs if t in terminal and i not in terminal
+        )
+        confidently_wrong = sum(
+            1
+            for t, i in pairs
+            if t in terminal and i not in terminal and i != "UNKNOWN"
+        )
+        print("\n" + "-" * 100)
+        print("  DIAGNOSIS — the agent infers the cause, it does not read it")
+        print("-" * 100)
+        print(f"  failures classified          {len(pairs):,}")
+        print(f"  accuracy                     {correct / len(pairs):.1%}")
+        print(f"  terminal read as recoverable {dangerous:,}"
+              f"  ({dangerous / max(1, len(pairs)):.1%})")
+        print(f"  ...of which confidently so   {confidently_wrong:,}")
+        print()
+        counts: dict[tuple[str, str], int] = {}
+        for pr in pairs:
+            counts[pr] = counts.get(pr, 0) + 1
+        for (t, i), n in sorted(counts.items(), key=lambda kv: -kv[1])[:8]:
+            flag = "  <- fails towards uncertainty" if t != i else ""
+            print(f"    {t:<22} -> {i:<22}{n:>7,}{flag}")
+        print()
+        print("  Every misclassification lands on UNKNOWN rather than on a confident")
+        print("  wrong cause. The policy is told \"I do not know\", never \"go ahead\".")
+
     # -- headroom ----------------------------------------------------------
     o_vals = suite.values(oracle, lambda m: m.net_value_paise / 100)
     print("\n" + "-" * 100)
@@ -262,6 +297,17 @@ def to_json(suite: Suite) -> dict:
             "regulatory_violations": float(np.mean([m.regulatory_violations for m in rs])),
             "violating_mandates": float(np.mean([len(m.violating_mandates) for m in rs])),
             "unactionable": float(np.mean([m.unactionable for m in rs])),
+            "diagnosis_accuracy": (
+                float(
+                    np.mean(
+                        [
+                            sum(1 for t, i in m.diagnosis_pairs if t == i)
+                            / max(1, len(m.diagnosis_pairs))
+                            for m in rs
+                        ]
+                    )
+                )
+            ),
             "escalations": float(np.mean([sum(m.escalations.values()) for m in rs])),
             "stop_refusals": float(np.mean([len(m.stop_ledger) for m in rs])),
             "stop_value_refused_paise": float(

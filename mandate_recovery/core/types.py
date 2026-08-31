@@ -108,6 +108,9 @@ class MandateState:
     contacts_used: int
     issuer_id: str
     variable_amount_allowed: bool = False
+    #: The code the rails actually returned on the last failure. This is what
+    #: a merchant observes; `cause` is what a diagnosis layer inferred from it.
+    last_error_code: str | None = None
 
     def with_(self, **changes: object) -> "MandateState":
         return replace(self, **changes)  # type: ignore[arg-type]

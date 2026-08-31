@@ -67,8 +67,8 @@ commit — it says what runs, not what is planned.
 | `predict/` — calibrated monotone survival model | **done** |
 | `belief/` — EM-fitted pay-cycle phase filter | **done** |
 | `policy/` — priced DP allocator with option value | **done** |
+| `diagnose/` — rules ratchet with a one-way terminal ratchet | **done** |
 | `ingest/` — Razorpay test-mode webhooks | not started |
-| `diagnose/` — rules ratchet + LLM adjudicator | not started |
 
 ---
 
@@ -168,19 +168,19 @@ $ make results
 
   policy                                    recovered    net value    rate  ₹/attempt  survived  illegal
   B0 · no retry                                 ₹0.00        ₹0.00   0.0%          0     81.5%        0
-  B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90       79%        0
-  B2 · greedy EV, no budget reasoning    ₹1,96,704.20 ₹1,93,679.60  34.8%        130       78%        0
-  B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60       80%      966
-  allocator · priced DP with option value ₹2,14,496.26 ₹2,11,646.06  38.0%        151       78%        0
+  B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,788.90  29.4%         90       79%        0
+  B2 · greedy EV, no budget reasoning    ₹2,00,084.60 ₹1,97,171.20  35.4%        137       78%        0
+  B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,539.40  20.6%         60       80%      966
+  allocator · priced DP with option value ₹2,14,446.60 ₹2,11,703.00  37.9%        157       78%        0
   oracle · clairvoyant, lawful           ₹3,31,608.72 ₹3,30,356.12  58.7%        530     80.6%        0
 
   vs B1, paired difference in net value, 95% bootstrap CI
-  B2 · greedy EV                     +30,881 ₹  [+25,731, +35,943]  p=0.0020  10/10 seeds
-  allocator                          +48,848 ₹  [+42,644, +54,751]  p=0.0020  10/10 seeds
+  B2 · greedy EV                     +34,382 ₹  [+27,829, +40,781]  p=0.0020  10/10 seeds
+  allocator                          +48,914 ₹  [+40,349, +58,253]  p=0.0020  10/10 seeds
   B3 · Stripe-style                  -50,250 ₹  [-53,986, -46,384]  p=0.0020  0/10 seeds
 
   allocator vs B2, same model and belief:
-                                     +17,966 ₹  [+11,174, +25,031]  p=0.0020  10/10 seeds
+                                     +14,532 ₹  [ +4,186, +23,704]  p=0.0371   9/10 seeds
 
   recovery efficiency against the lawful clairvoyant: 29.2%
   audit: 146,846 hash-chained records — every presentation replayable

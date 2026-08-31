@@ -42,6 +42,7 @@ from ..core.types import (
     MandateState,
     MandateStatus,
 )
+from ..diagnose.rules import diagnose
 from .customer import Population, build_population
 from .issuer import ISSUERS, IssuerModel, build_issuers
 from .rng import RandomTape
@@ -87,6 +88,11 @@ class WorldConfig:
     first_failure_revokes: bool = True
     #: Fraction of the book presenting for the first time since registration.
     new_registration_share: float = 0.12
+    #: Share of failures that come back with a code carrying no information —
+    #: a bank saying "technical decline" and nothing more. Real, and the
+    #: reason the diagnosis layer has something to do: without it every code
+    #: maps one-to-one onto a cause and classification is free.
+    ambiguous_code_share: float = 0.08
     #: Hazard multipliers for customer-initiated revocation.
     revoke_per_failed_debit: float = 0.85
     revoke_per_contact: float = 0.55
@@ -130,6 +136,7 @@ class MandateTruth:
     contacts_used: int = 0
     collected: Paise = 0
     last_cause: CauseClass = CauseClass.UNKNOWN
+    last_error_code: str | None = None
     revoked_slot: int | None = None
 
 
@@ -162,6 +169,7 @@ class World:
 
         self._collected: dict[int, list[tuple[int, Paise]]] = {}
         self._tech_u: dict[int, np.ndarray] = {}
+        self._ambiguous_u: dict[int, np.ndarray] = {}
         self._revoke_u: dict[int, np.ndarray] = {}
         self._by_id = {m.mandate_id: m for m in self.mandates}
         self._resolved_days: dict[int, int] = {}
@@ -281,11 +289,19 @@ class World:
     # -- what the agent may see -------------------------------------------
 
     def observable(self, m: MandateTruth) -> MandateState:
-        """The agent's view. Contains no latent state, by construction."""
+        """The agent's view. Contains no latent state, by construction.
+
+        The cause is **inferred** from the error code the rails returned, not
+        copied from the simulator's ground truth. Reading `last_cause`
+        directly would have been defensible — the modelled codes map cleanly
+        onto causes — but it left classification error out of every reported
+        number, which is not the same thing as it being zero.
+        """
+        inferred = diagnose(m.last_error_code)
         return MandateState(
             mandate_id=m.mandate_id,
             status=m.status,
-            cause=m.last_cause,
+            cause=inferred.cause,
             attempts_used=m.attempts_used,
             is_first_presentation=m.is_first_presentation,
             amount_due_paise=m.amount_due - m.collected,
@@ -297,6 +313,7 @@ class World:
             contacts_used=m.contacts_used,
             issuer_id=ISSUERS[m.issuer].code,
             variable_amount_allowed=m.variable_amount_allowed,
+            last_error_code=m.last_error_code,
         )
 
     def failed_book(self, at_slot: int) -> list[MandateTruth]:
@@ -332,7 +349,14 @@ class World:
 
         def fail(cause: CauseClass, revoked: bool = False) -> Presentation:
             code, desc = ERROR_CODES[cause]
+            # Some failures come back uninformative. Drawn from the addressed
+            # tape so the blur is part of the world rather than of the run.
+            if self._ambiguous_uniform(m.customer)[slot % self.config.days] < (
+                self.config.ambiguous_code_share
+            ):
+                code, desc = "technical_decline", "Transaction declined by bank"
             m.last_cause = cause
+            m.last_error_code = code
             return Presentation(
                 mandate_id=mandate_id, at=at, amount_paise=amount_paise, ok=False,
                 collected_paise=0, cause=cause, error_code=code,
@@ -373,6 +397,7 @@ class World:
         self._collected.setdefault(m.customer, []).append((slot, amount_paise))
         m.collected += amount_paise
         m.last_cause = CauseClass.UNKNOWN
+        m.last_error_code = None
         if m.collected >= m.amount_due:
             m.status = MandateStatus.COMPLETED
         return Presentation(
@@ -394,6 +419,15 @@ class World:
         return GroundTruth(self.population, self.issuers, self.mandates)
 
     # -- internals ---------------------------------------------------------
+
+    def _ambiguous_uniform(self, entity: int) -> np.ndarray:
+        arr = self._ambiguous_u.get(entity)
+        if arr is None:
+            arr = self.tape.uniform(
+                "diagnose.ambiguous", entity, self.config.days + 1
+            )
+            self._ambiguous_u[entity] = arr
+        return arr
 
     def _tech_uniform(self, entity: int) -> np.ndarray:
         arr = self._tech_u.get(entity)
