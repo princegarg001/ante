@@ -262,6 +262,68 @@ journal and the same gateway records.
 It runs in CI on every push. A demonstration that only works on one laptop is a liability, and
 one that quietly stops working gets discovered live.
 
+## The evaluation runs through this
+
+Until day 8 there were two separate paths to the world. The crash demo drove the
+write-ahead log, the idempotency keys and the hash-chained receipts. The evaluation
+harness called the simulator directly. Both were individually sound — the constraint
+layer gated each — but it meant the reported rupees had never travelled through the
+audited path, and the obvious question had an awkward answer:
+
+> *"Is your measured recovery actually going through the money path you verified?"*
+
+It is now. `WorldGateway` presents the simulator as a `PaymentGateway`, so the headline
+run drives the real `Executor`: intent fsynced before every effect, outcome fsynced
+after, each presentation addressable by its own idempotency key, and the whole run
+reconstructible with `--replay`.
+
+```bash
+make results        # every presentation written to a hash-chained journal
+make replay         # reconstruct any run from it
+```
+
+::: tip The audit layer records the run; it must not change it
+A subtlety worth stating, because getting it wrong would have been invisible. The
+gateway deliberately does **not** call `world.notify` when raising a notification. Doing
+so would add a customer contact per commit, raise the revocation hazard, and make an
+audited run score differently from an unaudited one — so the audit would have been
+quietly altering the experiment it was supposed to be recording.
+
+There is a test asserting that a run produces byte-identical recovery, presentation and
+revocation counts with the audit on and off.
+:::
+
+## Compliant escalation
+
+A retry is not the only thing an agent can do, and for a large share of a failed batch it
+is the wrong thing. The action space has always carried the alternatives; until day 8 no
+policy ever used them, so every dead mandate collapsed into `Stop`.
+
+<div class="table-scroll">
+
+| Cause | What the mandate actually needs |
+| --- | --- |
+| `AFA_REQUIRED` | **`RequestAFA`** — above the ceiling, so it needs authentication, not abandonment |
+| `MANDATE_EXPIRED` / `MANDATE_REVOKED` | **`RequestRemandate`** — re-registration, which is a customer conversation rather than a payment |
+| `VPA_INVALID` | **`RequestRemandate`** |
+| Any of the above, above ₹1,000 outstanding | **`EscalateHuman`**, with a written summary — an operator costs money, so whether that is worth spending depends on what is being recovered |
+| `TERMINAL` (account closed) | **`Stop`** — no payment route exists |
+
+</div>
+
+Two things had to change for the ladder to fire at all.
+
+**Dead mandates are now offered to the policy.** They were previously filtered out of the
+candidate set for not being `LIVE`, and silently counted as "unactionable". But a revoked
+mandate sitting in the merchant's book with money outstanding *is* a decision — and one
+the brief explicitly asks for. Nothing unsafe follows: the constraint layer vetoes any
+debit against them (C12, RATCHET), so the only moves available are escalations.
+
+**Status is checked as well as cause.** A mandate can die between decisions without the
+last observed failure code saying so. Reading only the cause meant a mandate revoked
+mid-cycle still had debits proposed at it — B1 collected 6,045 C12 vetoes that way. The
+status is the fact; the cause is only the last thing the rails happened to report.
+
 ## Replay
 
 ```bash

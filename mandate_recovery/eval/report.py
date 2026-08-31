@@ -74,7 +74,9 @@ def _policies(world: World, fitted: Fitted) -> list:
     ]
 
 
-def run_suite(seeds: Sequence[int], config: WorldConfig) -> Suite:
+def run_suite(
+    seeds: Sequence[int], config: WorldConfig, audit_dir: Path | None = None
+) -> Suite:
     fitted = trained_model(config)
     runs: dict[str, list[RunMetrics]] = {}
     for seed in seeds:
@@ -83,7 +85,7 @@ def run_suite(seeds: Sequence[int], config: WorldConfig) -> Suite:
         for index in range(n_policies):
             world = World.generate(seed, ORIGIN, config)
             policy = _policies(world, fitted)[index]
-            metrics = run_policy(policy, world)
+            metrics = run_policy(policy, world, audit_dir=audit_dir)
             runs.setdefault(policy.name, []).append(metrics)
     return Suite(tuple(seeds), config, runs)
 
@@ -110,6 +112,11 @@ def render(suite: Suite) -> None:
           f"failed mandates, "
           f"{fmt(int(np.mean([m.batch_value_paise for m in suite.runs[names[0]]])))} at risk")
     print("  pairing      common random numbers — every policy meets the identical world")
+    audited = [m for rs in suite.runs.values() for m in rs if m.journal_path]
+    if audited:
+        records = sum(m.journal_records for m in audited)
+        print(f"  audit        {records:,} hash-chained records across "
+              f"{len(audited)} runs — every presentation is replayable")
     unact = np.mean([m.unactionable for m in suite.runs[names[0]]])
     unact_v = np.mean([m.unactionable_value_paise for m in suite.runs[names[0]]])
     print(f"  unactionable {unact:,.0f} of them ({fmt(int(unact_v))}) — already revoked or expired")
@@ -117,7 +124,7 @@ def render(suite: Suite) -> None:
 
     print("\n" + "-" * 100)
     hdr = (f"  {'policy':<38}{'recovered':>13}{'net value':>13}{'rate':>8}"
-           f"{'₹/attempt':>11}{'survived':>10}{'stops':>7}{'illegal':>9}")
+           f"{'₹/att':>8}{'surv':>7}{'stop':>6}{'escal':>7}{'illegal':>9}")
     print(hdr)
     print("-" * 100)
     for name in names:
@@ -127,9 +134,10 @@ def render(suite: Suite) -> None:
             f"{fmt(int(np.mean([m.recovered_paise for m in rs]))):>13}"
             f"{fmt(int(np.mean([m.net_value_paise for m in rs]))):>13}"
             f"{np.mean([m.recovery_rate for m in rs]):>7.1%}"
-            f"{np.mean([m.slot_efficiency_paise for m in rs]) / 100:>11,.0f}"
-            f"{np.mean([m.survival_rate for m in rs]):>10.1%}"
-            f"{np.mean([m.stops for m in rs]):>7,.0f}"
+            f"{np.mean([m.slot_efficiency_paise for m in rs]) / 100:>8,.0f}"
+            f"{np.mean([m.survival_rate for m in rs]):>7.0%}"
+            f"{np.mean([m.stops for m in rs]):>6,.0f}"
+            f"{np.mean([sum(m.escalations.values()) for m in rs]):>7,.0f}"
             f"{np.mean([len(m.violating_mandates) for m in rs]):>9,.0f}"
         )
 
@@ -165,6 +173,48 @@ def render(suite: Suite) -> None:
         share = np.mean([len(m.violating_mandates) / max(1, m.batch_size) for m in rs])
         print(f"  {name:<38}{detail}")
         print(f"  {'':<38}on {touched:,.0f} mandates ({share:.0%} of the batch)")
+
+    # -- the stop list, scored ---------------------------------------------
+    print("\n" + "-" * 100)
+    print("  THE STOP LIST — what was refused, and what refusing it cost")
+    print("-" * 100)
+    print(f"  {'policy':<38}{'refusals':>10}{'value refused':>16}"
+          f"{'right':>9}{'regret':>14}{'regret %':>10}")
+    for name in names:
+        rs = suite.runs[name]
+        rows = [r for m in rs for r in m.stop_ledger]
+        if not rows:
+            print(f"  {name:<38}{'—':>10}")
+            continue
+        n = len(rows) / len(rs)
+        refused = sum(r.outstanding_paise for r in rows) / len(rs)
+        regret = sum(r.recoverable_paise for r in rows) / len(rs)
+        right = sum(1 for r in rows if r.was_right) / max(1, len(rows))
+        print(f"  {name:<38}{n:>10,.0f}{fmt(int(refused)):>16}"
+              f"{right:>9.0%}{fmt(int(regret)):>14}"
+              f"{regret / max(1.0, refused):>10.1%}")
+    print()
+    print("  'right' is the share of refusals from which a clairvoyant could have")
+    print("  collected nothing. 'regret' is what the rest would in fact have paid —")
+    print("  ground truth, computed after the run, never visible to any policy.")
+
+    # -- escalation ladder --------------------------------------------------
+    print("\n" + "-" * 100)
+    print("  COMPLIANT ESCALATION — what happens to a mandate a retry cannot help")
+    print("-" * 100)
+    for name in names:
+        rs = suite.runs[name]
+        tally: dict[str, float] = {}
+        for m in rs:
+            for kind, count in m.escalations.items():
+                tally[kind] = tally.get(kind, 0.0) + count / len(rs)
+        if not tally:
+            print(f"  {name:<38}stops only — no escalation ladder")
+            continue
+        detail = "   ".join(
+            f"{k}×{v:,.0f}" for k, v in sorted(tally.items(), key=lambda kv: -kv[1])
+        )
+        print(f"  {name:<38}{detail}")
 
     # -- headroom ----------------------------------------------------------
     o_vals = suite.values(oracle, lambda m: m.net_value_paise / 100)
@@ -212,6 +262,14 @@ def to_json(suite: Suite) -> dict:
             "regulatory_violations": float(np.mean([m.regulatory_violations for m in rs])),
             "violating_mandates": float(np.mean([len(m.violating_mandates) for m in rs])),
             "unactionable": float(np.mean([m.unactionable for m in rs])),
+            "escalations": float(np.mean([sum(m.escalations.values()) for m in rs])),
+            "stop_refusals": float(np.mean([len(m.stop_ledger) for m in rs])),
+            "stop_value_refused_paise": float(
+                np.mean([sum(r.outstanding_paise for r in m.stop_ledger) for m in rs])
+            ),
+            "stop_realised_regret_paise": float(
+                np.mean([sum(r.recoverable_paise for r in m.stop_ledger) for m in rs])
+            ),
             "stopped_value_paise": float(np.mean([m.stopped_value_paise for m in rs])),
             "batch_size": float(np.mean([m.batch_size for m in rs])),
             "batch_value_paise": float(np.mean([m.batch_value_paise for m in rs])),
@@ -231,6 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seeds", default="100-109", help="e.g. 100-109 or 100,101")
     ap.add_argument("--mandates", type=int, default=1_500)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--audit",
+        type=Path,
+        help="drive every presentation through the write-ahead log and "
+             "hash-chained receipts, so the reported rupees are replayable",
+    )
     args = ap.parse_args(argv)
 
     for stream in (sys.stdout, sys.stderr):
@@ -239,7 +303,11 @@ def main(argv: list[str] | None = None) -> int:
         except (AttributeError, OSError):
             pass
 
-    suite = run_suite(_parse_seeds(args.seeds), WorldConfig(n_mandates=args.mandates))
+    suite = run_suite(
+        _parse_seeds(args.seeds),
+        WorldConfig(n_mandates=args.mandates),
+        audit_dir=args.audit,
+    )
     render(suite)
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)

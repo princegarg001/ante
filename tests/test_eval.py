@@ -270,16 +270,23 @@ def test_recovery_efficiency_is_share_of_available_headroom() -> None:
 
 
 def test_the_stop_list_accounts_for_the_whole_batch() -> None:
-    """A policy that refuses everything must refuse everything it was *offered*,
-    and the rest must be accounted for separately.
+    """Every mandate in the batch must be accounted for exactly once.
 
-    Found by this test: some mandates are already revoked or expired by the time
-    the first epoch runs, so no policy is ever asked about them. Folding those
-    into the stop list would credit a policy with a judgement it never made.
+    This test previously asserted that some mandates were *unactionable* —
+    already revoked or expired before the first epoch, so no policy was ever
+    asked about them. That was true, and it was a gap: a mandate sitting in the
+    merchant's book with money outstanding is a decision the agent should be
+    made to take, even when the only lawful moves are escalations.
+
+    Dead mandates are now offered, the escalation ladder fires on them, and the
+    unactionable bucket is empty. The invariant is unchanged and stronger: stops
+    plus escalations plus unactionable equal the batch, and no rupee goes
+    unaccounted for.
     """
     w, cal = fresh()
     m = run_policy(StopEverything(cal), w)
     assert m.presentations == 0
-    assert m.unactionable > 0, "the accounting gap this test exists for is gone"
-    assert m.stops + m.unactionable == m.batch_size
+    escalated = sum(m.escalations.values())
+    assert m.stops + escalated + m.unactionable == m.batch_size
     assert m.stopped_value_paise + m.unactionable_value_paise == m.batch_value_paise
+    assert len(m.stop_ledger) == m.stops + escalated

@@ -11,9 +11,17 @@ Ten held-out seeds, 1,500 mandates each, paired on common random numbers. Reprod
 <div class="stat-grid">
   <div class="stat"><span class="v">986</span><span class="k">failed mandates / seed</span></div>
   <div class="stat"><span class="v">₹5.65L</span><span class="k">at risk per seed</span></div>
-  <div class="stat ok"><span class="v">₹1.68L</span><span class="k">headroom to the oracle</span></div>
-  <div class="stat"><span class="v">10</span><span class="k">held-out seeds</span></div>
+  <div class="stat ok"><span class="v">29.2%</span><span class="k">of lawful headroom captured</span></div>
+  <div class="stat ok"><span class="v">146,846</span><span class="k">hash-chained receipts</span></div>
 </div>
+
+::: tip Every rupee here has a receipt
+This run was driven through the audited money path: intent written and `fsync`ed before
+every effect, outcome written after, each presentation addressable by its own idempotency
+key. 146,846 hash-chained records across 60 runs, and `make replay` reconstructs any of
+them. The audit layer records the run without changing it — there is
+[a test asserting the numbers are identical with it on and off](/system/action-layer#the-evaluation-runs-through-this).
+:::
 
 ## What is being measured
 
@@ -37,14 +45,14 @@ a judgement it never made.
 
 <div class="table-scroll">
 
-| Policy | Recovered | Net value | Rate | ₹/attempt | Survived | Stops | Illegal |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| B0 · no retry | ₹0 | ₹0 | 0.0% | 0 | 81.5% | 0 | 0 |
-| **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,799** | 29.4% | 90 | 78.9% | 70 | 0 |
-| **B2 · greedy EV, no budget reasoning** | ₹2,05,943 | **₹2,03,107** | 36.4% | 145 | 78.0% | 70 | 0 |
-| B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,549 | 20.6% | 60 | 79.8% | 0 | **746** |
-| *oracle · clairvoyant, lawful* | *₹3,31,609* | *₹3,30,356* | *58.7%* | *530* | *80.6%* | *169* | *0* |
-| **allocator · priced DP with option value** | ₹2,17,993 | **₹2,15,289** | 38.6% | 161 | 77.8% | 155 | 0 |
+| Policy | Recovered | Net value | Rate | ₹/att | Surv | Stops | Escal | Illegal |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| B0 · no retry | ₹0 | ₹0 | 0.0% | 0 | 81% | 0 | 0 | 0 |
+| **B1 · fixed +24/+72/+168h** | ₹1,66,482 | **₹1,62,799** | 29.4% | 90 | 79% | 316 | 0 | 0 |
+| **B2 · greedy EV, no budget reasoning** | ₹1,96,704 | **₹1,93,680** | 34.8% | 130 | 78% | 327 | 0 | 0 |
+| B3 · Stripe-style, 8 attempts / 2 weeks | ₹1,16,410 | ₹1,12,549 | 20.6% | 60 | 80% | 0 | 0 | **966** |
+| **allocator · priced DP with option value** | ₹2,14,496 | **₹2,11,646** | **38.0%** | 151 | 78% | 121 | **256** | 0 |
+| *oracle · clairvoyant, lawful* | *₹3,31,609* | *₹3,30,356* | *58.7%* | *530* | *81%* | *397* | *0* | *0* |
 
 </div>
 
@@ -59,10 +67,17 @@ and ₹0.50 per contact. Those are modelling choices, stated rather than buried.
 | vs B1 | Mean difference | 95% bootstrap CI | p | Seeds won |
 | --- | ---: | :---: | ---: | ---: |
 | B0 · no retry | −₹1,62,799 | [−170,023, −156,802] | 0.0020 | 0/10 |
-| **B2 · greedy EV** | **+₹40,308** | [+33,860, +46,898] | 0.0020 | **10/10** |
-| **allocator** | **+₹52,490** | [+44,363, +60,967] | 0.0020 | **10/10** |
+| **B2 · greedy EV** | **+₹30,881** | [+25,731, +35,943] | 0.0020 | **10/10** |
+| **allocator** | **+₹48,848** | [+42,644, +54,751] | 0.0020 | **10/10** |
 | B3 · Stripe-style | −₹50,250 | [−53,986, −46,384] | 0.0020 | 0/10 |
 | oracle | +₹1,67,558 | [+162,506, +172,920] | 0.0020 | 10/10 |
+
+And the comparison that carries the thesis — same model, same belief, the only
+difference is that one of them treats a retry slot as scarce and priced:
+
+| | Mean difference | 95% bootstrap CI | p | Seeds won |
+| --- | ---: | :---: | ---: | ---: |
+| **allocator vs B2** | **+₹17,966** | [+11,174, +25,031] | 0.0020 | **10/10** |
 
 </div>
 
@@ -85,8 +100,8 @@ without modification:
 
 | | |
 | --- | --- |
-| Illegal actions proposed | **C5 × 1,106**, RATCHET × 552, C2 × 296 |
-| Mandates affected | **746 — 76% of the batch** |
+| Illegal actions proposed | **C12 × 1,770**, C5 × 1,106, RATCHET × 552, C2 × 296 |
+| Mandates affected | **966 — 98% of the batch** |
 | Net value versus the industry heuristic | **−₹50,250** |
 
 </div>
@@ -135,11 +150,62 @@ recovery efficiency = (policy − B1) / (oracle − B1)
 | Policy | Recovery efficiency |
 | --- | ---: |
 | B3 · Stripe-style | −30.0% |
-| B2 · greedy EV | 24.1% |
-| **allocator** | **31.3%** |
+| B2 · greedy EV | 18.4% |
+| **allocator** | **29.2%** |
 
-"We captured 31% of what any lawful policy could have" bounds what is left on the table.
-"We beat the heuristic by 32%" does not.
+"We captured 29% of what any lawful policy could have" bounds what is left on the table.
+"We beat the heuristic by 30%" does not.
+
+## The stop list, scored
+
+Every other submission optimises recovery. This one reports the money it chose **not** to
+chase, and what that caution actually cost — measured against ground truth after the run,
+never visible to any policy.
+
+<div class="table-scroll">
+
+| Policy | Refusals | Value refused | Right | Regret | Regret % |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| B1 · fixed schedule | 316 | ₹1,85,139 | 100% | ₹0 | 0.0% |
+| B2 · greedy EV | 327 | ₹1,90,978 | 100% | ₹0 | 0.0% |
+| **allocator** | **377** | **₹2,08,013** | **91%** | **₹11,422** | **5.5%** |
+| *oracle · clairvoyant* | *397* | *₹2,33,017* | *100%* | *₹857* | *0.4%* |
+
+</div>
+
+**"Right" is the share of refusals from which a clairvoyant could have collected nothing.**
+
+The baselines score 100% for an uninteresting reason: they refuse *only* what is obviously
+dead — a revoked mandate, a closed account. No judgement is involved, so none can be wrong.
+
+The allocator additionally refuses live mandates it has decided are not worth chasing. That
+is a judgement, it is right 91% of the time, and being wrong the other 9% costs ₹11,422 —
+5.5% of the value it declined. The clairvoyant, which refuses only what is truly
+unrecoverable, sets the floor at 0.4%.
+
+That gap between 0.4% and 5.5% is the honest price of not being able to see the future, and
+it is the number a payments risk person will want. It is reported rather than omitted.
+
+## Compliant escalation
+
+A retry is not the only available action, and for a large part of a failed batch it is the
+wrong one.
+
+<div class="table-scroll">
+
+| Policy | Escalation ladder |
+| --- | --- |
+| B0, B1, B2, B3, oracle | stops only |
+| **allocator** | **`RequestRemandate` × 225 · `EscalateHuman` × 31** |
+
+</div>
+
+A mandate above its AFA ceiling needs authentication. A lapsed or revoked one needs
+re-registration — a customer conversation, not a payment. Above ₹1,000 outstanding it is
+worth an operator's time and gets a written summary. A closed account needs nothing at all.
+
+Collapsing all of those into `Stop` throws away the distinction that matters operationally,
+and it is the difference between *stopping* and *escalating compliantly*.
 
 ## Which idea earned the number
 

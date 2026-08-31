@@ -142,6 +142,19 @@ class DecisionContext:
         }
 
 
+def presentation_key(
+    mandate_id: str, cycle_id: str, attempt_index: int, when: datetime, amount: Paise
+) -> str:
+    """Identity of a *presentation*, distinct from the notification that
+    authorised it. Two operations, two keys — a replayed notification must not
+    dedupe against the debit it precedes."""
+    material = "|".join(
+        ["present", mandate_id, cycle_id, str(attempt_index),
+         to_ist(when).isoformat(), str(amount)]
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 def idempotency_key(
     mandate_id: str, cycle_id: str, attempt_index: int, action: Commit
 ) -> str:
@@ -420,6 +433,88 @@ class Executor:
 
         status: Status = "APPLIED" if result.ok else "FAILED"
         return Outcome(status, key, result.error_description or "ok", result)
+
+    def present(
+        self,
+        mandate_id: str,
+        sequence_id: str | None,
+        when: datetime,
+        amount: Paise,
+        ctx: DecisionContext,
+    ) -> Outcome:
+        """Execute the debit the notification authorised, durably and once.
+
+        The same two-phase shape as `submit`: intent fsynced, effect performed,
+        outcome fsynced. A crash between the second and third step leaves the
+        presentation in doubt and `recover()` resolves it by interrogation —
+        which for a debit is the difference between charging a customer twice
+        and not.
+        """
+        run_id = self._require_run()
+        key = presentation_key(
+            ctx.mandate_id, ctx.cycle_id, ctx.attempt_index, when, amount
+        )
+
+        if self.kill_switch.is_set():
+            self.journal.append(RecordKind.KILL, run_id, self._ts(), {"idem_key": key})
+            self._skip(run_id, key, "KILLED", "kill switch engaged")
+            return Outcome("KILLED", key, "kill switch engaged")
+
+        if key in self.ledger.applied:
+            prior = self.ledger.applied[key]
+            self._skip(run_id, key, "DUPLICATE", "presentation already applied")
+            return Outcome(
+                "DUPLICATE", key, f"already presented as {prior.get('external_ref')}",
+                GatewayResult(
+                    ok=bool(prior.get("ok")), idem_key=key,
+                    external_ref=prior.get("external_ref"), replayed=True,
+                ),
+            )
+
+        if key in self.ledger.in_doubt:
+            raise RuntimeError(
+                f"presentation {key[:12]} is in doubt — call recover() before running"
+            )
+
+        self._check_ceilings(run_id, key, amount)
+
+        self.journal.append(
+            RecordKind.INTENT,
+            run_id,
+            self._ts(),
+            {
+                "idem_key": key,
+                "op": "present",
+                "mandate_id": ctx.mandate_id,
+                "sequence_id": sequence_id,
+                "execute_at": to_ist(when).isoformat(),
+                "amount_paise": amount,
+                "mode": self.mode.value,
+            },
+        )
+
+        presenter = getattr(self.gateway, "present_at", None)
+        if presenter is not None:
+            result = presenter(key, ctx.mandate_id, when, amount)
+        else:
+            result = self.gateway.present(key, ctx.mandate_id, sequence_id or "", amount)
+
+        self._append_effect(
+            run_id=run_id, ts=self._ts(), idem_key=key, performed=True,
+            result=result, amount_paise=amount, resolution="fresh",
+        )
+        self.ledger.applied[key] = {
+            "idem_key": key, "ok": result.ok,
+            "external_ref": result.external_ref, "amount_paise": amount,
+        }
+        self.ledger.executions[run_id] = self.ledger.executions.get(run_id, 0) + 1
+        self.ledger.paise_attempted[run_id] = (
+            self.ledger.paise_attempted.get(run_id, 0) + amount
+        )
+        return Outcome(
+            "APPLIED" if result.ok else "FAILED", key,
+            result.error_description or "ok", result,
+        )
 
     # -- internals ---------------------------------------------------------
 

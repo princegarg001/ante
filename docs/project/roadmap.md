@@ -6,10 +6,10 @@ planned — the distinction is the point.
 ## Current state
 
 <div class="stat-grid">
-  <div class="stat ok"><span class="v">240</span><span class="k">tests passing</span></div>
+  <div class="stat ok"><span class="v">243</span><span class="k">tests passing</span></div>
   <div class="stat ok"><span class="v">2.5 M</span><span class="k">triples verified</span></div>
   <div class="stat ok"><span class="v">11 / 11</span><span class="k">mutants killed</span></div>
-  <div class="stat"><span class="v">6 / 12</span><span class="k">days elapsed</span></div>
+  <div class="stat"><span class="v">8 / 12</span><span class="k">days elapsed</span></div>
 </div>
 
 <div class="table-scroll">
@@ -51,7 +51,8 @@ day 10, not day 13.
 | 5 | 29 Aug | Belief filter, P(success) model, isotonic calibration | ✅ calibrated, ECE 0.023, B2 beats B1 |
 | 6 | 30 Aug | **Policy: per-mandate DP, prices, auction** | ✅ +₹52,490 vs B1 on 10/10 seeds, 31.3% of headroom |
 | 7 | 31 Aug | **Dual ascent and slot auction**, B2/B3 baselines | Auction book prints; B3 violation count published |
-| 8 | 1 Sept | Diagnosis: rules ratchet, LLM adjudicator, disagreement log | Confusion matrix |
+| 7 | 31 Aug | **Compliance verification** against primary sources | ✅ both instruments identified; one claim withdrawn |
+| 8 | 31 Aug | Audit trail carries the numbers · escalation ladder · scored stop list | ✅ 146,846 receipts; 256 escalations; regret measured at 5.5% |
 | 9 | 2 Sept | Razorpay test-mode webhooks, signature verification, red-team suite | Real `payment.failed` → decision |
 | 10 | 3 Sept | **Code freeze.** Conformal stop bound, docs, 10-seed run | Clean clone → `make demo` |
 | 11 | 4 Sept | Pitch video, architecture diagram | Recorded |

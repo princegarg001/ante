@@ -46,8 +46,18 @@ from typing import Final, Mapping, Sequence
 import numpy as np
 
 from ..belief.filter import PhaseBelief, PhaseProfile
-from ..core.money import Paise
-from ..core.types import TERMINAL_CAUSES, Action, Commit, Stop
+from ..core.money import Paise, fmt
+from ..core.types import (
+    TERMINAL_CAUSES,
+    Action,
+    CauseClass,
+    Commit,
+    EscalateHuman,
+    RequestAFA,
+    RequestRemandate,
+    MandateStatus,
+    Stop,
+)
 from ..eval.policy import Calendar, Candidate
 from ..predict.features import FeatureContext, IssuerTracker, extract
 from ..predict.model import TrainedModel
@@ -138,6 +148,74 @@ def estimate_revocation_hazard(
     return float(lost / extra_attempts_per_mandate)
 
 
+#: Above this, a dead mandate is worth an operator's time rather than an
+#: automated give-up. Deliberately a rupee threshold: escalation costs a human,
+#: and whether that is worth spending depends on what is being recovered.
+HUMAN_ESCALATION_FLOOR: Final[Paise] = 100_000     # Rs 1,000
+
+
+def effective_cause(state) -> CauseClass | None:
+    """The terminal cause implied by a mandate's state, if any.
+
+    A mandate can die between decisions — the customer revokes, or the validity
+    lapses — without the *last observed failure code* saying so. The status is
+    the fact; the cause is only the last thing the rails happened to report.
+
+    Reading only the cause meant a mandate revoked mid-cycle still had debits
+    proposed at it, and the constraint layer vetoed every one. Correct, but the
+    policy should not be proposing them: a merchant looking at a dead mandate
+    asks for re-registration, it does not try the card again.
+    """
+    if state.cause in TERMINAL_CAUSES:
+        return state.cause
+    if state.status is MandateStatus.REVOKED:
+        return CauseClass.MANDATE_REVOKED
+    if state.status is MandateStatus.EXPIRED:
+        return CauseClass.MANDATE_EXPIRED
+    return None
+
+
+def escalate(cause: CauseClass, outstanding: Paise, mandate_id: str) -> Action:
+    """The right next move for a mandate that no retry can help.
+
+    Collapsing every terminal cause into `Stop` throws away the distinction that
+    matters operationally. A mandate above its AFA ceiling needs authentication,
+    not abandonment. A lapsed or revoked mandate needs re-registration, which is
+    a customer conversation rather than a payment. A closed account needs
+    nothing at all.
+
+    Each is a different action addressed to a different party, and the brief
+    asks for compliant *escalation* rather than merely for stopping.
+    """
+    if cause is CauseClass.AFA_REQUIRED:
+        return RequestAFA()
+
+    if cause in (CauseClass.MANDATE_EXPIRED, CauseClass.MANDATE_REVOKED):
+        if outstanding >= HUMAN_ESCALATION_FLOOR:
+            return EscalateHuman(
+                summary=(
+                    f"{mandate_id}: mandate "
+                    f"{cause.value.lower().replace('_', ' ')}, "
+                    f"{fmt(outstanding)} outstanding. Re-registration needs AFA; "
+                    f"worth a call at this value."
+                )
+            )
+        return RequestRemandate()
+
+    if cause is CauseClass.VPA_INVALID:
+        return RequestRemandate()
+
+    if cause is CauseClass.TERMINAL and outstanding >= HUMAN_ESCALATION_FLOOR:
+        return EscalateHuman(
+            summary=(
+                f"{mandate_id}: account closed or frozen with {fmt(outstanding)} "
+                f"outstanding. No payment route remains; collections decision."
+            )
+        )
+
+    return Stop(reason=f"terminal cause {cause.value}; no route to collection")
+
+
 def _block_of(calendar: Calendar, slot: int) -> tuple[int, int]:
     """Which shared execution window a slot belongs to.
 
@@ -210,8 +288,11 @@ class SlotAllocator:
         to_solve: list[Candidate] = []
 
         for c in batch:
-            if c.state.cause in TERMINAL_CAUSES:
-                out[c.mandate_id] = Stop(reason=f"terminal cause {c.state.cause.value}")
+            dead = effective_cause(c.state)
+            if dead is not None:
+                out[c.mandate_id] = escalate(
+                    dead, c.state.amount_due_paise, c.mandate_id
+                )
                 continue
 
             fired = self._fire_if_due(c, out)

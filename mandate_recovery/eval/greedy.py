@@ -42,7 +42,7 @@ import numpy as np
 
 from ..belief.filter import PhaseBelief, PhaseProfile
 from ..core.money import Paise
-from ..core.types import TERMINAL_CAUSES, Action, Commit, Stop
+from ..core.types import TERMINAL_CAUSES, Action, Commit, MandateStatus, Stop
 from ..predict.features import FeatureContext, IssuerTracker, extract
 from ..predict.model import TrainedModel
 from .policy import Calendar, Candidate
@@ -103,6 +103,11 @@ class GreedyEV:
         pending: list[tuple[Candidate, np.ndarray, list[tuple[int, float]]]] = []
 
         for c in batch:
+            if c.state.status is not MandateStatus.LIVE:
+                out[c.mandate_id] = Stop(
+                    reason=f"mandate is {c.state.status.value}, not LIVE"
+                )
+                continue
             if c.state.cause in TERMINAL_CAUSES:
                 out[c.mandate_id] = Stop(reason=f"terminal cause {c.state.cause.value}")
                 continue

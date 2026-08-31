@@ -168,18 +168,22 @@ $ make results
 
   policy                                    recovered    net value    rate  ₹/attempt  survived  illegal
   B0 · no retry                                 ₹0.00        ₹0.00   0.0%          0     81.5%        0
-  B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90     78.9%        0
-  B2 · greedy EV, no budget reasoning    ₹2,05,943.00 ₹2,03,106.80  36.4%        145     78.0%        0
-  B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60     79.8%      746
-  allocator · priced DP with option value ₹2,17,993.10 ₹2,15,288.50  38.6%        161     77.8%        0
+  B1 · fixed +24/+72/+168h               ₹1,66,482.30 ₹1,62,798.50  29.4%         90       79%        0
+  B2 · greedy EV, no budget reasoning    ₹1,96,704.20 ₹1,93,679.60  34.8%        130       78%        0
+  B3 · Stripe-style, 8 attempts / 2 weeks ₹1,16,410.20 ₹1,12,548.80  20.6%         60       80%      966
+  allocator · priced DP with option value ₹2,14,496.26 ₹2,11,646.06  38.0%        151       78%        0
   oracle · clairvoyant, lawful           ₹3,31,608.72 ₹3,30,356.12  58.7%        530     80.6%        0
 
   vs B1, paired difference in net value, 95% bootstrap CI
-  B2 · greedy EV                     +40,308 ₹  [+33,860, +46,898]  p=0.0020  10/10 seeds
-  allocator                          +52,490 ₹  [+44,363, +60,967]  p=0.0020  10/10 seeds
+  B2 · greedy EV                     +30,881 ₹  [+25,731, +35,943]  p=0.0020  10/10 seeds
+  allocator                          +48,848 ₹  [+42,644, +54,751]  p=0.0020  10/10 seeds
   B3 · Stripe-style                  -50,250 ₹  [-53,986, -46,384]  p=0.0020  0/10 seeds
 
-  recovery efficiency against the lawful clairvoyant: 31.3%
+  allocator vs B2, same model and belief:
+                                     +17,966 ₹  [+11,174, +25,031]  p=0.0020  10/10 seeds
+
+  recovery efficiency against the lawful clairvoyant: 29.2%
+  audit: 146,846 hash-chained records — every presentation replayable
   oracle · clairvoyant, lawful      +167,558 ₹  [+162,506, +172,920] p=0.0020  10/10 seeds
 ```
 

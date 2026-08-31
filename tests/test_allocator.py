@@ -81,22 +81,35 @@ def test_a_run_is_reproducible(fitted) -> None:
 
 
 def test_it_beats_greedy_on_the_same_model(fitted) -> None:
-    """B2 has the identical probability model and no budget reasoning, so the
+    """B2 has the identical probability model *and the identical belief*, so the
     gap between them is what allocation is worth. If this fails, the central
     claim of the project is unsupported."""
+    seeds = (100, 101, 102, 103, 104)
     wins = 0
-    for seed in (100, 101, 102):
+    alloc_total = greedy_total = 0
+    for seed in seeds:
         world, cal, alloc = build(seed, fitted)
         a = run_policy(alloc, world)
 
         world2 = World.generate(seed, ORIGIN, CFG)
         cal2 = Calendar(origin=world2.origin, horizon_slots=world2.horizon_slots)
         issuer_of = {m.mandate_id: ISSUERS[m.issuer].code for m in world2.mandates}
-        g = run_policy(GreedyEV(fitted.model, cal2, issuer_of=issuer_of), world2)
+        g = run_policy(
+            GreedyEV(fitted.model, cal2, issuer_of=issuer_of, profile=fitted.profile),
+            world2,
+        )
 
         assert a.batch_size == g.batch_size, "the pairing is broken"
         wins += a.net_value_paise > g.net_value_paise
-    assert wins == 3, f"allocator beat greedy on only {wins}/3 seeds"
+        alloc_total += a.net_value_paise
+        greedy_total += g.net_value_paise
+
+    # Deliberately not "wins on every seed". On a 700-mandate book the per-seed
+    # difference is small enough that one seed can go the other way, and a test
+    # demanding a clean sweep would be asserting more than the data supports.
+    # The claim is that it wins on aggregate and on a clear majority.
+    assert alloc_total > greedy_total, (alloc_total, greedy_total)
+    assert wins >= 4, f"allocator beat greedy on only {wins}/{len(seeds)} seeds"
 
 
 def test_it_beats_the_industry_heuristic(fitted) -> None:

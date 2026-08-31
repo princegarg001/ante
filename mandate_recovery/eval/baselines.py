@@ -22,7 +22,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Final, Mapping, Sequence
 
-from ..core.types import TERMINAL_CAUSES, Action, Commit, Stop, Wait
+from ..core.types import (
+    TERMINAL_CAUSES,
+    Action,
+    Commit,
+    MandateStatus,
+    Stop,
+    Wait,
+)
 from .policy import Calendar, Candidate
 
 MIN_LEAD_SLOTS: Final[int] = 48    # 24h
@@ -68,6 +75,15 @@ class FixedSchedule:
     def plan(self, batch: Sequence[Candidate], now: datetime) -> Mapping[str, Action]:
         out: dict[str, Action] = {}
         for c in batch:
+            # A mandate can die between decisions without the last observed
+            # failure code saying so, so the status is checked as well as the
+            # cause. Reading only the cause left B1 proposing debits at revoked
+            # mandates and collecting thousands of C12 vetoes.
+            if c.state.status is not MandateStatus.LIVE:
+                out[c.mandate_id] = Stop(
+                    reason=f"mandate is {c.state.status.value}, not LIVE"
+                )
+                continue
             if c.state.cause in TERMINAL_CAUSES:
                 out[c.mandate_id] = Stop(reason=f"terminal cause {c.state.cause.value}")
                 continue

@@ -33,7 +33,7 @@ from datetime import datetime
 from typing import Final, Mapping, Sequence
 
 from ..core.money import Paise
-from ..core.types import Action, Commit, Stop
+from ..core.types import TERMINAL_CAUSES, Action, Commit, MandateStatus, Stop
 from ..sim.world import Doom, World
 from .policy import Calendar, Candidate
 
@@ -69,7 +69,25 @@ class ClairvoyantOracle:
         out: dict[str, Action] = {}
         for c in batch:
             mid = c.mandate_id
-            if self._doom[mid] in (Doom.ACCOUNT_CLOSED, Doom.ALREADY_REVOKED, Doom.VALIDITY_LAPSED):
+            # Clairvoyance is not a licence. A dead mandate cannot be debited by
+            # anyone, and an oracle that proposes it would collect vetoes and
+            # invalidate the headroom number it exists to establish.
+            if (
+                c.state.status is not MandateStatus.LIVE
+                or c.state.cause in TERMINAL_CAUSES
+            ):
+                if self.stop_on_hopeless:
+                    out[mid] = Stop(
+                        reason=f"clairvoyant: mandate is {c.state.status.value}"
+                        f" / {c.state.cause.value}"
+                    )
+                continue
+
+            if self._doom[mid] in (
+                Doom.ACCOUNT_CLOSED,
+                Doom.ALREADY_REVOKED,
+                Doom.VALIDITY_LAPSED,
+            ):
                 if self.stop_on_hopeless:
                     out[mid] = Stop(reason=f"clairvoyant: {self._doom[mid].value}")
                 continue

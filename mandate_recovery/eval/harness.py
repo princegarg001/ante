@@ -25,17 +25,29 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Final, Mapping
 
+from pathlib import Path
+
+from ..act.executor import (
+    BlastRadius,
+    DecisionContext,
+    ExecutionMode,
+    Executor,
+)
+from ..act.journal import Journal
 from ..constraints import is_permitted
 from ..constraints.rules import RULES, RuleKind
 from ..core.clock import SLOTS_PER_DAY, is_non_peak
-from ..core.money import Paise, rupees
+from ..core.money import Paise, fmt, rupees
 from ..core.types import (
     Action,
     Commit,
+    EscalateHuman,
     MandateState,
     MandateStatus,
     NotifyOnly,
     PDN,
+    RequestAFA,
+    RequestRemandate,
     Stop,
     Wait,
 )
@@ -66,9 +78,34 @@ class MandateOutcome:
     attempts: int = 0
     contacts: int = 0
     stopped_reason: str | None = None
+    terminal_action: str = "Stop"
     alive_at_end: bool = True
     revoked: bool = False
     doom: str = "NONE"
+
+
+@dataclass(slots=True)
+class StopRecord:
+    """A refusal, and what it actually cost.
+
+    `recoverable_paise` comes from the simulator's ground truth and is computed
+    *after* the run: the best a clairvoyant could have collected from the slots
+    that remained. It is never visible to the policy. It exists so the stop list
+    can be scored rather than merely listed — a refusal of a mandate that would
+    never have paid is correct, and one of a mandate that would have paid is the
+    price of caution.
+    """
+
+    mandate_id: str
+    action: str
+    reason: str
+    outstanding_paise: Paise
+    recoverable_paise: Paise
+    doom: str
+
+    @property
+    def was_right(self) -> bool:
+        return self.recoverable_paise == 0
 
 
 @dataclass(slots=True)
@@ -89,6 +126,12 @@ class RunMetrics:
 
     stops: int = 0
     stopped_value_paise: Paise = 0
+    #: Escalations by kind. The brief asks for compliant *escalation*, not
+    #: only for stopping: a mandate above its AFA ceiling needs
+    #: authentication rather than abandonment.
+    escalations: dict[str, int] = field(default_factory=dict)
+    #: One row per refusal, scored against ground truth after the run.
+    stop_ledger: list[StopRecord] = field(default_factory=list)
     #: Mandates the policy was never offered — already revoked or expired when
     #: the first epoch ran, or the cycle closed before the notification aperture
     #: could open on them. They are not refusals, and folding them into the stop
@@ -106,6 +149,11 @@ class RunMetrics:
     violating_mandates: set[str] = field(default_factory=set)
 
     per_mandate: dict[str, MandateOutcome] = field(default_factory=dict)
+
+    #: Set when the run was driven through the audited money path. Every
+    #: presentation then has a hash-chained receipt and the run replays.
+    journal_path: str | None = None
+    journal_records: int = 0
 
     # -- derived -----------------------------------------------------------
 
@@ -151,10 +199,40 @@ def run_policy(
     world: World,
     *,
     enforce: bool = True,
+    audit_dir: "Path | str | None" = None,
 ) -> RunMetrics:
-    """Run one policy against one world. The world is consumed; build a fresh one per policy."""
+    """Run one policy against one world. The world is consumed; build a fresh one per policy.
+
+    With `audit_dir`, every presentation goes through the real `Executor`:
+    intent fsynced to a hash-chained journal before the effect, outcome fsynced
+    after, each decision addressable by its idempotency key, and the whole run
+    reconstructible with `--replay`. Without it the same decisions are taken
+    against the simulator directly, which is faster for the test suite.
+
+    The audited and unaudited paths must produce identical numbers. The audit
+    layer records the run; it does not alter it, and there is a test asserting
+    exactly that.
+    """
     policy.reset(world.seed)
     metrics = RunMetrics(policy=policy.name, seed=world.seed)
+
+    audit: Executor | None = None
+    gateway = None
+    if audit_dir is not None:
+        from .gateway import WorldGateway
+
+        journal = Journal(Path(audit_dir) / f"{world.seed}-{_slug(policy.name)}.jsonl")
+        gateway = WorldGateway(world)
+        audit = Executor(
+            journal,
+            gateway,
+            now=lambda: world.origin,
+            mode=ExecutionMode.LIVE,
+            blast_radius=BlastRadius.unlimited(),
+        )
+        audit.recover()
+        audit.begin_run(f"{policy.name}::{world.seed}")
+        metrics.journal_path = str(journal.path)
 
     # -- 1. the original execution, which is not the agent's decision -------
     batch: list[MandateTruth] = []
@@ -193,7 +271,26 @@ def run_policy(
             if exec_slot != slot:
                 continue
             del pending[mid]
-            result = world.present(mid, now, amount)
+            if audit is not None and gateway is not None:
+                # `attempts_used` increments inside the presentation, so the key
+                # must come back from the executor rather than be recomputed
+                # afterwards from state that has already moved.
+                executed = audit.present(
+                    mid,
+                    None,
+                    now,
+                    amount,
+                    DecisionContext(
+                        mandate_id=mid,
+                        cycle_id="2026-09",
+                        attempt_index=by_id[mid].attempts_used,
+                        justification=f"presenting {fmt(amount)} at the committed slot",
+                        policy_version=policy.name,
+                    ),
+                )
+                result = gateway.outcomes[executed.idem_key]
+            else:
+                result = world.present(mid, now, amount)
             # Policies may learn from their own outcomes. Optional, so a policy
             # that does not care never has to know the hook exists.
             observe = getattr(policy, "observe", None)
@@ -212,6 +309,18 @@ def run_policy(
         if (slot - start) % EPOCH_SLOTS:
             continue
 
+        # Deliberately not filtered to LIVE mandates.
+        #
+        # A revoked or lapsed mandate is still sitting in the merchant's book
+        # with money outstanding, and deciding what to do about it — request
+        # re-registration, escalate to a human, or write it off — is a real
+        # decision the agent should be made to take. Filtering them out meant
+        # they were silently counted as "unactionable" and the escalation ladder
+        # could never fire, which is exactly the clause the brief asks for.
+        #
+        # Nothing unsafe follows: the constraint layer vetoes any debit against
+        # them (C12, RATCHET), so the only actions available are escalations,
+        # and a mandate leaves the pool as soon as one is taken.
         candidates = [
             Candidate(
                 mandate_id=m.mandate_id,
@@ -222,7 +331,6 @@ def run_policy(
             for m in batch
             if m.mandate_id not in stopped
             and m.mandate_id not in pending
-            and m.status is MandateStatus.LIVE
             and m.collected < m.amount_due
             and m.attempts_used < 4
             and slot + MIN_LEAD_SLOTS <= m.cycle_end_slot
@@ -256,12 +364,43 @@ def run_policy(
                 world.notify(cand.mandate_id, action.at)
                 metrics.contacts += 1
                 metrics.per_mandate[cand.mandate_id].contacts += 1
-            elif isinstance(action, Stop):
+            elif isinstance(action, (Stop, RequestAFA, RequestRemandate, EscalateHuman)):
                 stopped.add(cand.mandate_id)
                 out = metrics.per_mandate[cand.mandate_id]
-                out.stopped_reason = action.reason
-                metrics.stops += 1
-                metrics.stopped_value_paise += by_id[cand.mandate_id].amount_due - out.recovered
+                kind = type(action).__name__
+                out.terminal_action = kind
+                out.stopped_reason = (
+                    getattr(action, "reason", None)
+                    or getattr(action, "summary", None)
+                    or kind
+                )
+                if isinstance(action, Stop):
+                    metrics.stops += 1
+                else:
+                    metrics.escalations[kind] = metrics.escalations.get(kind, 0) + 1
+                metrics.stopped_value_paise += (
+                    by_id[cand.mandate_id].amount_due - out.recovered
+                )
+
+    # -- the stop ledger, scored against ground truth ----------------------
+    for mid in sorted(stopped):
+        truth = by_id[mid]
+        out = metrics.per_mandate[mid]
+        outstanding = truth.amount_due - truth.collected
+        metrics.stop_ledger.append(
+            StopRecord(
+                mandate_id=mid,
+                action=out.terminal_action,
+                reason=out.stopped_reason or "",
+                outstanding_paise=outstanding,
+                recoverable_paise=_best_achievable(world, truth, outstanding),
+                doom=truth.doom.value,
+            )
+        )
+
+    if audit is not None:
+        audit.end_run("completed")
+        metrics.journal_records = audit.journal.verify()
 
     # -- 3. tally ----------------------------------------------------------
     for m in batch:
@@ -301,6 +440,46 @@ def _state_with_pending(
             amount_paise=amount,
         )
     )
+
+
+def _best_achievable(world: World, truth: MandateTruth, outstanding: Paise) -> Paise:
+    """What a clairvoyant could still have collected from this mandate.
+
+    Ground truth, used only after the run to score refusals. The stop list is
+    only defensible if the cost of caution is measured rather than assumed to
+    be zero.
+    """
+    # A dead mandate collects nothing however much money is in the account.
+    # An earlier version scored only the balance and therefore reported regret
+    # on closed accounts — making a correct refusal look like a costly one and
+    # the stop list look far worse than it was.
+    if outstanding <= 0:
+        return 0
+    if truth.doom in (Doom.ACCOUNT_CLOSED, Doom.ALREADY_REVOKED, Doom.VALIDITY_LAPSED):
+        return 0
+    if truth.status in (MandateStatus.REVOKED, MandateStatus.EXPIRED):
+        return 0
+    lo = min(truth.due_slot + 48, world.horizon_slots - 1)
+    hi = min(truth.cycle_end_slot, truth.validity_end_slot, world.horizon_slots - 1)
+    best = 0
+    for slot in range(lo, hi + 1, 4):
+        if not is_non_peak(world.time_of(slot)):
+            continue
+        balance = world.balance_at(truth.customer, slot)
+        take = (
+            min(outstanding, balance)
+            if truth.variable_amount_allowed
+            else (outstanding if balance >= outstanding else 0)
+        )
+        if take > best:
+            best = take
+            if best >= outstanding:
+                break
+    return int(best)
+
+
+def _slug(name: str) -> str:
+    return "".join(c if c.isalnum() else "-" for c in name)[:48].strip("-")
 
 
 def _next_non_peak(world: World, slot: int) -> int:
