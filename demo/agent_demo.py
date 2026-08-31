@@ -150,9 +150,12 @@ def main() -> int:
 
     for plan in shown[: args.limit]:
         colour, label = STYLE.get(plan.action, (DIM, plan.action))
+        # A refusal carries no amount, because nothing is being presented.
+        # Printing it as a rupee zero reads as a bug rather than as an absence.
+        money = fmt(plan.amount_paise) if plan.amount_paise else "—"
         print(
             f"  {plan.mandate_id:<12} {colour}{label}{OFF}  "
-            f"{fmt(plan.amount_paise):>10}   {DIM}{plan.reason}{OFF}"
+            f"{money:>10}   {DIM}{plan.reason}{OFF}"
         )
         if args.delay:
             sys.stdout.flush()
@@ -163,7 +166,6 @@ def main() -> int:
 
     # ------------------------------------------------------------------ #
     counts = {a: sum(1 for pl in book if pl.action == a) for a in STYLE}
-    refused = sum(pl.amount_paise for pl in book if pl.action == "stop")
     committed = sum(pl.amount_paise for pl in book if pl.action == "commit")
 
     rule("2 · What it decided")
@@ -171,8 +173,8 @@ def main() -> int:
           f"   {DIM}an attempt spent{OFF}")
     print(f"  {AMBER}waiting{OFF}     {counts['wait']:>4}   {'':>12}"
           f"   {DIM}aperture not open yet — patience, not surrender{OFF}")
-    print(f"  {RED}refused{OFF}     {counts['stop']:>4}   {fmt(refused):>12}"
-          f"   {DIM}will not be chased again this cycle{OFF}")
+    print(f"  {RED}refused{OFF}     {counts['stop']:>4}   {'':>12}"
+          f"   {DIM}the attempt is worth less than the mandate it risks{OFF}")
 
     rule("3 · What the whole run collected")
     print(f"  batch                {metrics.batch_size} failed mandates"
