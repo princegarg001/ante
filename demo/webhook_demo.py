@@ -131,7 +131,13 @@ def main() -> int:
     workdir = Path(tempfile.mkdtemp(prefix="ante-webhook-demo-"))
     journal_path = workdir / "webhooks.jsonl"
 
-    receiver = Receiver(ReceiverConfig(secret=SECRET, journal_path=journal_path))
+    receiver = Receiver(
+        ReceiverConfig(
+            secret=SECRET,
+            journal_path=journal_path,
+            clock=lambda: datetime.now(IST),
+        )
+    )
     # Port 0: the OS picks a free one, so the demo cannot collide with whatever
     # else is listening on this machine.
     server = make_server(HOST, 0, make_application(receiver), handler_class=_Quiet)

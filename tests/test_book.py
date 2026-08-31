@@ -270,7 +270,11 @@ def test_the_book_rebuilds_from_the_verified_journal(tmp_path: Path) -> None:
     from tests.test_ingest import SECRET, payment_failed, sign
 
     receiver = Receiver(
-        ReceiverConfig(secret=SECRET, journal_path=tmp_path / "hooks.jsonl")
+        ReceiverConfig(
+            secret=SECRET,
+            journal_path=tmp_path / "hooks.jsonl",
+            clock=lambda: ORIGIN,
+        )
     )
     # Distinct amounts, so each delivery is a genuinely different event rather
     # than a duplicate the receiver is right to collapse.

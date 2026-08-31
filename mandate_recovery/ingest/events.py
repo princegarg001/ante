@@ -21,10 +21,9 @@ recorded as unhandled — visible, not fatal.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Final, Mapping
 
-from ..core.clock import IST
 from ..core.money import Paise
 from ..core.types import CauseClass
 from ..diagnose.rules import diagnose
@@ -118,14 +117,17 @@ def normalise(
     *,
     event_id: str,
     raw_digest: str,
-    received_at: datetime | None = None,
+    received_at: datetime,
 ) -> FailureEvent:
     """Turn a verified Razorpay webhook body into a `FailureEvent`.
 
     Called only after the signature has been checked. Nothing here validates
     authenticity — by this point that question is already settled.
+
+    `received_at` is passed in rather than read here. Nothing in this package
+    reads the wall clock: it is what makes a run replayable and the exhaustive
+    verification meaningful, and `tests/test_purity.py` enforces it over the AST.
     """
-    received_at = received_at or datetime.now(timezone.utc).astimezone(IST)
     event_type = str(body.get("event", "")) or "unknown"
 
     payload = body.get("payload")

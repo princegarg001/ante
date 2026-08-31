@@ -10,11 +10,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from mandate_recovery.act.journal import Journal, RecordKind
+from mandate_recovery.core.clock import IST
 from mandate_recovery.core.types import CauseClass
 from mandate_recovery.ingest.events import RAZORPAY_EVENTS, is_failure, normalise
 from mandate_recovery.ingest.receiver import Receipt, Receiver, ReceiverConfig
@@ -81,9 +83,20 @@ def payment_failed(
     ).encode("utf-8")
 
 
+#: A fixed clock. The receiver takes time as an argument, so its output is a
+#: pure function of its input and these tests do not drift with the wall.
+FROZEN = datetime(2026, 3, 1, 9, 0, tzinfo=IST)
+
+
 @pytest.fixture
 def receiver(tmp_path: Path) -> Receiver:
-    return Receiver(ReceiverConfig(secret=SECRET, journal_path=tmp_path / "hooks.jsonl"))
+    return Receiver(
+        ReceiverConfig(
+            secret=SECRET,
+            journal_path=tmp_path / "hooks.jsonl",
+            clock=lambda: FROZEN,
+        )
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -218,10 +231,10 @@ def test_deduplication_survives_a_restart(tmp_path: Path) -> None:
     body = payment_failed()
     headers = sign(body)
 
-    first = Receiver(ReceiverConfig(secret=SECRET, journal_path=path))
+    first = Receiver(ReceiverConfig(secret=SECRET, journal_path=path, clock=lambda: FROZEN))
     assert first.handle(body, headers).outcome == "accepted"
 
-    restarted = Receiver(ReceiverConfig(secret=SECRET, journal_path=path))
+    restarted = Receiver(ReceiverConfig(secret=SECRET, journal_path=path, clock=lambda: FROZEN))
     assert restarted.handle(body, headers).outcome == "duplicate"
     assert restarted.accepted_count == 1
 
@@ -256,7 +269,7 @@ def test_the_journal_stays_verifiable_across_many_events(receiver: Receiver) -> 
 def test_the_cause_is_inferred_not_taken_from_the_payload() -> None:
     """The provider's own words are evidence, not a verdict."""
     body = json.loads(payment_failed(error_code="mandate_revoked"))
-    event = normalise(body, event_id="evt_1", raw_digest="d" * 64)
+    event = normalise(body, event_id="evt_1", raw_digest="d" * 64, received_at=FROZEN)
     assert event.cause is CauseClass.MANDATE_REVOKED
     # Razorpay puts a coarse class in `error_code` ("BAD_REQUEST_ERROR") and the
     # specific one in `error_reason`. The specific one is what gets classified
@@ -267,7 +280,7 @@ def test_the_cause_is_inferred_not_taken_from_the_payload() -> None:
 
 def test_an_uninformative_code_becomes_uncertainty() -> None:
     body = json.loads(payment_failed(error_code="technical_decline"))
-    event = normalise(body, event_id="evt_2", raw_digest="d" * 64)
+    event = normalise(body, event_id="evt_2", raw_digest="d" * 64, received_at=FROZEN)
     assert event.cause is CauseClass.UNKNOWN
     assert event.confidence < 0.8
 
@@ -275,16 +288,24 @@ def test_an_uninformative_code_becomes_uncertainty() -> None:
 def test_a_payload_missing_everything_still_normalises() -> None:
     """Providers add fields, rename them and send shapes you have not seen. A
     normaliser that raises turns a schema change into an outage."""
-    event = normalise({"event": "payment.failed"}, event_id="evt_3", raw_digest="d" * 64)
+    event = normalise({"event": "payment.failed"}, event_id="evt_3", raw_digest="d" * 64, received_at=FROZEN)
     assert event.mandate_id == "unknown"
     assert event.amount_paise == 0
     assert event.cause is CauseClass.UNKNOWN
 
 
 def test_failure_events_are_distinguished_from_successes() -> None:
-    failed = normalise(json.loads(payment_failed()), event_id="e", raw_digest="d")
+    failed = normalise(
+        json.loads(payment_failed()),
+        event_id="e",
+        raw_digest="d",
+        received_at=FROZEN,
+    )
     charged = normalise(
-        {"event": "subscription.charged", "payload": {}}, event_id="e2", raw_digest="d"
+        {"event": "subscription.charged", "payload": {}},
+        event_id="e2",
+        raw_digest="d",
+        received_at=FROZEN,
     )
     assert is_failure(failed)
     assert not is_failure(charged)

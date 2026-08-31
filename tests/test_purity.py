@@ -32,7 +32,14 @@ FORBIDDEN_CLOCK_CALLS = {
 
 #: `perf_counter` measures how long verification took. It never influences a
 #: verdict, so it is allowed — but only in the checker, which is not on the path.
-CLOCK_EXEMPT_FILES = {"modelcheck.py"}
+#:
+#: `wsgi.py` is the process boundary: an HTTP server has to know what time a
+#: request arrived, and that reading has to happen somewhere. Confining it to
+#: the transport adapter is what lets the receiver, the normaliser and the
+#: projection all take time as an argument — so an ingested run replays
+#: identically. `test_the_clock_enters_in_exactly_one_place` keeps this
+#: exemption from becoming somewhere to hide a second read.
+CLOCK_EXEMPT_FILES = {"modelcheck.py", "wsgi.py"}
 
 #: Anything that could make `is_permitted` depend on the outside world.
 FORBIDDEN_IMPORTS_ON_DECISION_PATH = {
@@ -191,3 +198,28 @@ def test_every_third_party_import_is_declared() -> None:
         "third-party imports missing from pyproject.toml dependencies: "
         + ", ".join(f"{n} ({w})" for n, w in sorted(undeclared.items()))
     )
+
+
+def test_the_clock_enters_in_exactly_one_place() -> None:
+    """The exemption for `wsgi.py` is for one reading, not for a habit.
+
+    An HTTP server has to know when a request arrived, so that reading has to
+    happen somewhere. Confining it to the transport adapter is what lets the
+    receiver, the normaliser and the projection all take time as an argument --
+    which is what makes an ingested run replay identically. Without this test,
+    the exemption is just a file where the guarantee quietly stops applying.
+    """
+    path = PACKAGE / "ingest" / "wsgi.py"
+    reads = [
+        f"{path.name}:{node.lineno}"
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and (
+            getattr(node.func.value, "id", None)
+            or getattr(node.func.value, "attr", None),
+            node.func.attr,
+        )
+        in FORBIDDEN_CLOCK_CALLS
+    ]
+    assert len(reads) == 1, f"expected exactly one wall-clock read, found {reads}"

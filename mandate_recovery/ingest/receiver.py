@@ -31,9 +31,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Final, Mapping
+from typing import Any, Callable, Final, Mapping
 
 from ..act.journal import Journal, RecordKind
 from .events import FailureEvent, normalise
@@ -71,6 +71,12 @@ class Receipt:
 class ReceiverConfig:
     secret: str
     journal_path: Path
+    #: Where wall-clock time enters. Injected rather than read, because nothing
+    #: in this package reads the clock -- that is what makes a run replayable,
+    #: and `tests/test_purity.py` enforces it over the AST. The WSGI adapter
+    #: supplies the real one; a test supplies a fixed one and gets a receiver
+    #: whose output is a pure function of its input.
+    clock: Callable[[], datetime]
     max_body_bytes: int = MAX_BODY_BYTES
     max_event_age_seconds: int = MAX_EVENT_AGE_SECONDS
     #: Reject events whose `created_at` is far in the past. Off by default
@@ -123,6 +129,8 @@ class Receiver:
             return Receipt(500, "error", None, "internal error")
 
     def _handle(self, raw_body: bytes, headers: Mapping[str, str]) -> Receipt:
+        now = self.config.clock()
+
         # 1. Authenticity, before the body is parsed or even decoded.
         try:
             verify_signature(
@@ -158,10 +166,12 @@ class Receiver:
         if not isinstance(body, dict):
             return Receipt(400, "rejected", event_id, "body is not a JSON object")
 
-        if self.config.enforce_event_age and not self._is_fresh(body):
+        if self.config.enforce_event_age and not self._is_fresh(body, now):
             return Receipt(400, "rejected", event_id, "event is too old")
 
-        event = normalise(body, event_id=event_id, raw_digest=digest)
+        event = normalise(
+            body, event_id=event_id, raw_digest=digest, received_at=now
+        )
 
         # 4. Record. An unhandled event type is still recorded and still
         #    acknowledged — refusing it would have the provider retry forever.
@@ -180,11 +190,11 @@ class Receiver:
 
     # -- internals ---------------------------------------------------------
 
-    def _is_fresh(self, body: Mapping[str, Any]) -> bool:
+    def _is_fresh(self, body: Mapping[str, Any], now: datetime) -> bool:
         created = body.get("created_at")
         if not isinstance(created, (int, float)):
             return True                     # nothing to check against
-        age = datetime.now(timezone.utc).timestamp() - float(created)
+        age = now.timestamp() - float(created)
         return age <= self.config.max_event_age_seconds
 
     def _record(self, event: FailureEvent) -> None:

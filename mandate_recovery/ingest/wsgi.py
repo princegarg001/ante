@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from ..core.clock import IST
 from .receiver import Receipt, Receiver, ReceiverConfig
 
 WEBHOOK_PATH = "/webhooks/razorpay"
@@ -45,6 +47,10 @@ def _config_from_env() -> ReceiverConfig:
     return ReceiverConfig(
         secret=secret,
         journal_path=Path(os.environ.get("ANTE_JOURNAL", "runs/ingest/webhooks.jsonl")),
+        # The one place in the package where wall-clock time enters. Everything
+        # downstream takes it as an argument, which is what keeps a run
+        # replayable; see `tests/test_purity.py`.
+        clock=lambda: datetime.now(IST),
     )
 
 
