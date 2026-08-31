@@ -68,7 +68,9 @@ commit — it says what runs, not what is planned.
 | `belief/` — EM-fitted pay-cycle phase filter | **done** |
 | `policy/` — priced DP allocator with option value | **done** |
 | `diagnose/` — rules ratchet with a one-way terminal ratchet | **done** |
-| `ingest/` — Razorpay test-mode webhooks | not started |
+| `ingest/` — signed webhook edge, exactly-once, stdlib-only | **done** |
+| `ingest/book.py` — event stream folded into a decidable book | **done** |
+| `demo/webhook_demo.py` — live server, signed requests, real refusals | **done** |
 
 ---
 

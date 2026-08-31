@@ -41,6 +41,10 @@ class RecordKind(Enum):
     and resolving it is what crash recovery is for.
     """
 
+    #: A webhook accepted at the edge. Recorded in the same hash chain as
+    #: decisions and effects, so the provenance of a failure and the
+    #: decision it led to sit in one verifiable log.
+    INGEST = "INGEST"
     RUN_START = "RUN_START"
     DECISION = "DECISION"
     INTENT = "INTENT"

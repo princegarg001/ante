@@ -48,5 +48,8 @@ jobs:
       - name: Crash safety — real kill -9 mid-batch
         run: python -m demo.crash_demo
 
+      - name: Webhook edge — live server, signed requests, real refusals
+        run: python -m demo.webhook_demo
+
       - name: Mutation testing — does the suite have teeth?
         run: python -m tests.mutation

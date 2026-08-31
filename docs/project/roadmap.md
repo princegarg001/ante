@@ -30,7 +30,8 @@ planned — the distinction is the point.
 | `predict/` — calibrated monotone survival model | ✅ **done** |
 | `belief/` — EM-fitted pay-cycle phase filter | ✅ **done** |
 | `policy/` — priced DP allocator with option value | ✅ **done** |
-| `ingest/` — Razorpay test-mode webhooks | not started |
+| `ingest/` — signed webhook edge, exactly-once, stdlib-only | **done** |
+| `ingest/book.py` — event stream folded into a decidable book | **done** |
 | `diagnose/` — rules ratchet, one-way terminal ratchet, confusion matrix | ✅ **done** |
 
 </div>

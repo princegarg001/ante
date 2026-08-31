@@ -75,6 +75,7 @@ export default defineConfig({
           { text: 'The allocator', link: '/system/allocator' },
           { text: 'Action space', link: '/system/action-space' },
           { text: 'The money path', link: '/system/action-layer' },
+          { text: 'The edge', link: '/system/ingest' },
         ],
       },
       {
